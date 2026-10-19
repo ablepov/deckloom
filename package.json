@@ -1,0 +1,29 @@
+{
+  "name": "deckloom",
+  "version": "0.1.0",
+  "description": "A local HTML presentation viewer, renderer and layout diagnostics engine",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/ablepov/deckloom.git" },
+  "homepage": "https://github.com/ablepov/deckloom#readme",
+  "bugs": { "url": "https://github.com/ablepov/deckloom/issues" },
+  "keywords": ["presentation", "slides", "html", "viewer", "renderer", "playwright"],
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
+  "type": "commonjs",
+  "main": "src/index.cjs",
+  "exports": {
+    ".": "./src/index.cjs",
+    "./node": "./src/index.cjs",
+    "./qa": "./src/qa.cjs"
+  },
+  "bin": { "deckloom": "bin/deckloom.cjs" },
+  "files": ["src", "bin", "viewer", "examples", "scripts", "test", "README.md", "LICENSE"],
+  "scripts": {
+    "check": "node scripts/check.cjs",
+    "test": "node --test test/*.test.cjs",
+    "dev": "node bin/deckloom.cjs dev --config=examples/deckloom.config.cjs",
+    "render:example": "node bin/deckloom.cjs render --config=examples/deckloom.config.cjs --deck=all"
+  },
+  "peerDependencies": { "playwright": ">=1.57.0 <2" },
+  "devDependencies": { "playwright": "1.59.1" },
+  "engines": { "node": ">=22" }
+}

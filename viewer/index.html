@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__DECKLOOM_TITLE__</title>
+    __DECKLOOM_FAVICON__
+    <style>
+      :root {
+        --bg: #0d1014;
+        --panel: #151a21;
+        --panel-strong: #1d232c;
+        --line: rgba(255, 255, 255, 0.14);
+        --line-strong: rgba(239, 174, 114, 0.6);
+        --text: #f5f0e8;
+        --muted: rgba(245, 240, 232, 0.66);
+        --accent: #efae72;
+        --stage: #05070a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background: linear-gradient(180deg, #10141a, var(--bg));
+        font-family:
+          "Wix Madefor Display",
+          "Geologica",
+          "Segoe UI",
+          Arial,
+          sans-serif;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .app {
+        --topbar-height: 64px;
+        min-height: 100vh;
+      }
+
+      .topbar {
+        position: relative;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 24px;
+        min-height: 64px;
+        padding: 10px 24px;
+      }
+
+      .brand {
+        min-width: 0;
+      }
+
+      .deck-picker {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+        cursor: pointer;
+      }
+
+      .deck-title {
+        min-width: 0;
+        font-size: 20px;
+        line-height: 1.3;
+        font-weight: 650;
+        overflow-wrap: anywhere;
+      }
+
+      .deck-picker svg {
+        flex: 0 0 auto;
+        width: 14px;
+        height: 14px;
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .deck-picker select {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        border: 0;
+        padding: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .deck-picker:has(select:focus-visible) {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+
+      .deck-picker option {
+        color: #151a21;
+        background: #fff;
+      }
+
+      .status {
+        margin-top: 3px;
+        min-width: 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .mode-group,
+      .jump {
+        display: flex;
+        align-items: center;
+      }
+
+      .mode-group {
+        gap: 2px;
+      }
+
+      .button,
+      .slide-tab {
+        border: 0;
+        color: var(--text);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .button {
+        width: 34px;
+        height: 32px;
+        padding: 0;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .button svg {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+        stroke: currentColor;
+        stroke-width: 1.9;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .button {
+        color: var(--muted);
+      }
+
+      .button:hover {
+        color: var(--text);
+      }
+
+      .button:focus-visible,
+      .slide-tab:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+
+      .button[aria-pressed="true"] {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .jump {
+        position: relative;
+        z-index: 1;
+        gap: 6px;
+        min-width: 0;
+        max-width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        padding: 24px 44px 12px;
+        scroll-padding-inline: 44px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--line) transparent;
+      }
+
+      .slide-tab {
+        flex: 0 0 auto;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        padding: 0;
+        color: var(--muted);
+        background: transparent;
+        font-size: 12px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        transform-origin: center bottom;
+        transform: translateX(var(--dock-shift, 0px)) scale(var(--dock-scale, 1));
+        transition: transform 100ms ease-out, color 140ms ease;
+      }
+
+      .slide-tab:hover,
+      .slide-tab[aria-current="true"] {
+        color: var(--accent);
+      }
+
+      .slide-tab[aria-current="true"] {
+        font-weight: 750;
+      }
+
+      .slide-number {
+        position: relative;
+        display: inline-block;
+        z-index: 1;
+      }
+
+      .slide-tab:focus-visible {
+        --dock-scale: 1.3;
+      }
+
+      .slide-dock {
+        position: fixed;
+        z-index: 30;
+        bottom: 10px;
+        left: 50%;
+        width: max-content;
+        max-width: calc(100% - 32px);
+        transform: translate(-50%, 6px);
+        transition: transform 180ms ease;
+      }
+
+      .slide-dock:hover,
+      .slide-dock:focus-within {
+        transform: translate(-50%, 0);
+      }
+
+      .slide-indicator {
+        position: absolute;
+        z-index: 0;
+        left: 0;
+        bottom: -10px;
+        width: 1px;
+        height: 80px;
+        border-radius: 2px 2px 0 0;
+        background: #fff;
+        mask-image: linear-gradient(to bottom, #000 var(--indicator-gap-start, 0px), transparent var(--indicator-gap-start, 0px), transparent var(--indicator-gap-end, 0px), #000 var(--indicator-gap-end, 0px));
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(calc(var(--indicator-x, 0px) - 0.5px));
+        transition: transform var(--indicator-duration, 260ms) ease-out;
+      }
+
+      .slide-indicator.is-visible {
+        opacity: 1;
+      }
+
+      .many-slides .jump {
+        gap: 3px;
+      }
+
+      .many-slides .slide-tab {
+        width: 24px;
+        font-size: 11px;
+      }
+
+      .app > main {
+        width: min(100%, 1980px);
+        margin: 0 auto;
+        padding: 20px 24px 100px;
+      }
+
+      .slides {
+        display: grid;
+        gap: 32px;
+      }
+
+      .slide-card {
+        display: grid;
+        gap: 0;
+        margin: 0;
+      }
+
+      .deck-mode .slide-card {
+        cursor: pointer;
+      }
+
+      .deck-mode .slide-card:hover .stage,
+      .deck-mode .slide-card:focus-visible .stage {
+        border-color: var(--line-strong);
+      }
+
+      .slide-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        min-width: 0;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.2;
+      }
+
+      .meta {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.3;
+        text-align: right;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .stage {
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        aspect-ratio: var(--slide-aspect, 16 / 9);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: var(--stage);
+      }
+
+      .stage img,
+      .html-inline {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .stage img {
+        object-fit: contain;
+      }
+
+      .html-inline {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+
+      /* Inline slide DOM keeps text selectable; injected CSS is scoped per slide. */
+      .html-inline-holder {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: var(--slide-width, 1920px);
+        height: var(--slide-height, 1080px);
+        overflow: hidden;
+        transform-origin: 0 0;
+        background: var(--stage);
+        isolation: isolate;
+        user-select: text;
+      }
+
+      .html-inline-error {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+        text-align: center;
+      }
+
+      .app.focus-mode > main {
+        width: min(100%, 1720px);
+        min-height: calc(100dvh - var(--topbar-height) - 84px);
+        display: grid;
+        align-content: center;
+        padding: 16px 24px;
+      }
+
+      .focus-mode .slides {
+        display: block;
+      }
+
+      .focus-mode .slide-card {
+        display: none;
+      }
+
+      .focus-mode .slide-card.is-active {
+        display: grid;
+        justify-items: center;
+      }
+
+      .focus-mode .stage {
+        width: min(100%, calc((100dvh - var(--topbar-height) - 116px) * var(--slide-aspect, 16 / 9)));
+      }
+
+      .deck-mode .slides {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 620px), 1fr));
+      }
+
+      .empty {
+        display: grid;
+        min-height: 320px;
+        place-items: center;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .is-loading .status {
+        color: var(--accent);
+      }
+
+      @media (max-width: 900px) {
+        .topbar {
+          gap: 12px;
+        }
+
+      }
+
+      @media (max-width: 560px) {
+        .topbar,
+        .app > main,
+        .app.focus-mode > main {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+
+        .topbar {
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 8px;
+        }
+
+        .deck-title {
+          font-size: 18px;
+        }
+
+        .slide-head {
+          display: grid;
+          gap: 4px;
+        }
+
+        .meta {
+          text-align: left;
+        }
+
+        .slide-dock {
+          max-width: calc(100% - 20px);
+        }
+
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .slide-dock,
+        .slide-dock .jump,
+        .slide-dock .slide-indicator,
+        .slide-dock .slide-tab {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app focus-mode is-loading" id="app">
+      <header class="topbar">
+        <div class="brand">
+          <label class="deck-picker" for="deckSelect">
+            <span class="deck-title" id="deckTitle" aria-hidden="true">Загрузка…</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            <select id="deckSelect" aria-label="Выбрать презентацию">
+              <option>Загрузка…</option>
+            </select>
+          </label>
+          <div class="status" id="status">Загрузка слайдов…</div>
+        </div>
+
+        <div class="mode-group" role="group" aria-label="Режим просмотра">
+          <button class="button" type="button" id="focusMode" aria-label="Листать" title="Листать — стрелками или колёсиком" aria-pressed="true"></button>
+          <button class="button" type="button" id="deckMode" aria-label="Обзор" title="Обзор всех слайдов" aria-pressed="false"></button>
+        </div>
+      </header>
+
+      <main>
+        <div class="slides" id="slides"></div>
+      </main>
+
+      <nav class="slide-dock" id="slideDock" aria-label="Номера слайдов">
+        <span class="slide-indicator" id="slideIndicator" aria-hidden="true"></span>
+        <div class="jump" id="jump"></div>
+      </nav>
+    </div>
+
+    <script>window.deckloomConfig = __DECKLOOM_CONFIG__;</script>
+    <script>
+      const app = document.getElementById("app");
+      const deckSelect = document.getElementById("deckSelect");
+      const deckTitleNode = document.getElementById("deckTitle");
+      const slidesRoot = document.getElementById("slides");
+      const jumpRoot = document.getElementById("jump");
+      const slideDock = document.getElementById("slideDock");
+      const slideIndicator = document.getElementById("slideIndicator");
+      const statusNode = document.getElementById("status");
+      const focusButton = document.getElementById("focusMode");
+      const deckButton = document.getElementById("deckMode");
+
+      const config = window.deckloomConfig || {};
+      const storagePrefix = config.storagePrefix || "deckloom";
+      const state = {
+        decks: [],
+        deckId: localStorage.getItem(`${storagePrefix}Deck`) || "",
+        slides: [],
+        index: 0,
+        mode: localStorage.getItem(`${storagePrefix}Mode`) || "focus",
+        signature: "",
+        decksSignature: "",
+        generatedAt: "",
+        requestInFlight: false,
+      };
+
+      const dockState = { hovered: false, frame: 0, pointerX: 0 };
+      const wheelState = { lastEvent: 0, direction: 0, distance: 0, consumed: false };
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let indicatorX = null;
+      let indicatorCutoutFrame = 0;
+      let indicatorCutoutUntil = 0;
+
+      function syncIndicatorCutout() {
+        const label = jumpRoot.querySelector('.slide-tab[aria-current="true"] .slide-number');
+        if (label) {
+          const number = label.getBoundingClientRect();
+          const line = slideIndicator.getBoundingClientRect();
+          slideIndicator.style.setProperty("--indicator-gap-start", `${Math.max(0, number.top - line.top - 2)}px`);
+          slideIndicator.style.setProperty("--indicator-gap-end", `${Math.min(line.height, number.bottom - line.top + 2)}px`);
+        }
+        indicatorCutoutFrame = performance.now() < indicatorCutoutUntil
+          ? requestAnimationFrame(syncIndicatorCutout) : 0;
+      }
+
+      function syncSlideIndicator({ navigation = false, instant = false } = {}) {
+        const activeTab = jumpRoot.querySelector('.slide-tab[aria-current="true"]');
+        if (!activeTab) {
+          slideIndicator.classList.remove("is-visible");
+          return;
+        }
+        // Match the number's target transform; the strip's own movement is shared.
+        const shift = parseFloat(activeTab.style.getPropertyValue("--dock-shift")) || 0;
+        const center = activeTab.offsetLeft + activeTab.offsetWidth / 2 - jumpRoot.scrollLeft + shift;
+        const visible = center >= 0 && center <= jumpRoot.clientWidth;
+        const x = Math.max(0, Math.min(center, jumpRoot.clientWidth));
+        slideIndicator.classList.toggle("is-visible", visible);
+        // Keep the white line out of the number's text area, including during zoom.
+        indicatorCutoutUntil = performance.now() + 140;
+        if (!indicatorCutoutFrame) syncIndicatorCutout();
+        if (indicatorX === x) return;
+        const duration = indicatorX === null || instant ? 0 : navigation ? 260 : 100;
+        slideIndicator.style.setProperty("--indicator-duration", `${duration}ms`);
+        slideIndicator.style.setProperty("--indicator-x", `${x.toFixed(2)}px`);
+        indicatorX = x;
+      }
+
+      function resetDockMagnification({ instant = false } = {}) {
+        cancelAnimationFrame(dockState.frame);
+        dockState.frame = 0;
+        jumpRoot.querySelectorAll(".slide-tab").forEach((button) => {
+          button.style.removeProperty("--dock-scale");
+          button.style.removeProperty("--dock-shift");
+        });
+        syncSlideIndicator({ instant });
+      }
+
+      function magnifyDock() {
+        dockState.frame = 0;
+        if (reducedMotion.matches || !dockState.hovered) return;
+        const pointerX = dockState.pointerX - jumpRoot.getBoundingClientRect().left + jumpRoot.scrollLeft;
+        // Measure untransformed positions so magnification never moves its own target.
+        const buttons = Array.from(jumpRoot.querySelectorAll(".slide-tab"));
+        const sizes = buttons.map((button) => {
+          const width = button.offsetWidth;
+          const distance = Math.abs(button.offsetLeft + width / 2 - pointerX);
+          const influence = distance < 88 ? (1 + Math.cos(Math.PI * distance / 88)) / 2 : 0;
+          const scale = 1 + influence * 0.6;
+          return { scale, extra: width * (scale - 1) };
+        });
+        const extraWidth = sizes.reduce((sum, size) => sum + size.extra, 0);
+        let offset = -extraWidth / 2;
+        buttons.forEach((button, index) => {
+          const size = sizes[index];
+          button.style.setProperty("--dock-scale", size.scale.toFixed(3));
+          button.style.setProperty("--dock-shift", `${(offset + size.extra / 2).toFixed(2)}px`);
+          offset += size.extra;
+        });
+        syncSlideIndicator();
+      }
+
+      slideDock.addEventListener("pointerenter", (event) => {
+        if (event.pointerType === "touch") return;
+        dockState.hovered = true;
+      });
+      slideDock.addEventListener("pointerleave", () => {
+        dockState.hovered = false;
+        resetDockMagnification();
+      });
+      jumpRoot.addEventListener("pointermove", (event) => {
+        if (event.pointerType === "touch") return;
+        dockState.pointerX = event.clientX;
+        if (!dockState.frame) dockState.frame = requestAnimationFrame(magnifyDock);
+      });
+      jumpRoot.addEventListener("pointerleave", resetDockMagnification);
+      jumpRoot.addEventListener("scroll", () => resetDockMagnification({ instant: true }));
+      reducedMotion.addEventListener("change", resetDockMagnification);
+
+      function syncViewerHeight() {
+        app.style.setProperty("--topbar-height", `${document.querySelector(".topbar").offsetHeight}px`);
+        scheduleHtmlFrameScale();
+      }
+      new ResizeObserver(syncViewerHeight).observe(document.querySelector(".topbar"));
+
+      const heroIconPath = {
+        rectangleStack:
+          "M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.251 2.251 0 0 0 4.5 9v.878m13.5-3A2.251 2.251 0 0 1 19.5 9v.878m0 0a2.25 2.25 0 0 1-.75.128H5.25a2.25 2.25 0 0 1-.75-.128m15 0V18A2.25 2.25 0 0 1 17.25 20.25H6.75A2.25 2.25 0 0 1 4.5 18V9.878",
+        squares:
+          "M3.75 3.75v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm6-12v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm6-12v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Z",
+      };
+
+      function icon(kind) {
+        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${heroIconPath[kind]}"/></svg>`;
+      }
+
+      focusButton.innerHTML = icon("rectangleStack");
+      deckButton.innerHTML = icon("squares");
+
+      function fileLabel(file) {
+        return file.replace(/\.(png|jpe?g|webp|html)$/i, "");
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => {
+          return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          }[char];
+        });
+      }
+
+      function formatTime(value) {
+        return new Intl.DateTimeFormat("ru-RU", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }).format(new Date(value));
+      }
+
+      function sourceForSlide(slide) {
+        if (slide.htmlUrl) {
+          return {
+            kind: "html",
+            url: slide.htmlUrl,
+            file: slide.htmlFile,
+            modifiedAt: slide.htmlModifiedAt,
+          };
+        }
+
+        return {
+          kind: "image",
+          url: slide.url,
+          file: slide.file,
+          modifiedAt: slide.modifiedAt,
+        };
+      }
+
+      function slideScopeId(slide) {
+        return `slide-scope-${String(slide.id || slide.no || "unknown")
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, "-")
+          .replace(/^-+|-+$/g, "")}`;
+      }
+
+      function splitSelectorList(selectorText) {
+        const selectors = [];
+        let start = 0;
+        let depth = 0;
+        let quote = "";
+        let escaped = false;
+
+        for (let index = 0; index < selectorText.length; index += 1) {
+          const char = selectorText[index];
+
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+
+          if (char === "\\") {
+            escaped = true;
+            continue;
+          }
+
+          if (quote) {
+            if (char === quote) quote = "";
+            continue;
+          }
+
+          if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+          }
+
+          if (char === "(" || char === "[") depth += 1;
+          if (char === ")" || char === "]") depth = Math.max(0, depth - 1);
+
+          if (char === "," && depth === 0) {
+            selectors.push(selectorText.slice(start, index).trim());
+            start = index + 1;
+          }
+        }
+
+        selectors.push(selectorText.slice(start).trim());
+        return selectors.filter(Boolean);
+      }
+
+      function scopeSingleSelector(selector, scopeSelector) {
+        const trimmed = selector.trim();
+        if (!trimmed) return trimmed;
+
+        if (/^(html|body|:root)$/.test(trimmed)) {
+          return scopeSelector;
+        }
+
+        const remappedDocumentSelector = trimmed.replace(
+          /(^|[\s>+~,(])(:root|html|body)(?=[:.#\s>+~,[)]|$)/g,
+          (_, prefix) => `${prefix}${scopeSelector}`
+        );
+
+        if (remappedDocumentSelector !== trimmed) {
+          return remappedDocumentSelector;
+        }
+
+        return `${scopeSelector} ${trimmed}`;
+      }
+
+      function scopeSelectorText(selectorText, scopeSelector) {
+        return splitSelectorList(selectorText)
+          .map((selector) => scopeSingleSelector(selector, scopeSelector))
+          .join(", ");
+      }
+
+      function rewriteCssRules(ruleList, scopeSelector) {
+        return Array.from(ruleList)
+          .map((rule) => {
+            if (rule.type === CSSRule.STYLE_RULE) {
+              return `${scopeSelectorText(rule.selectorText, scopeSelector)} { ${rule.style.cssText} }`;
+            }
+
+            if (rule.type === CSSRule.MEDIA_RULE) {
+              return `@media ${rule.conditionText} { ${rewriteCssRules(rule.cssRules, scopeSelector)} }`;
+            }
+
+            if (rule.type === CSSRule.SUPPORTS_RULE) {
+              return `@supports ${rule.conditionText} { ${rewriteCssRules(rule.cssRules, scopeSelector)} }`;
+            }
+
+            if ("cssRules" in rule && rule.cssRules && rule.conditionText) {
+              return `${rule.cssText.slice(0, rule.cssText.indexOf("{") + 1)} ${rewriteCssRules(
+                rule.cssRules,
+                scopeSelector
+              )} }`;
+            }
+
+            return rule.cssText;
+          })
+          .join("\n");
+      }
+
+      function fallbackScopeCss(cssText, scopeSelector) {
+        return cssText.replace(/(^|})\s*([^@{}][^{}]*)\{/g, (match, close, selectorText) => {
+          return `${close} ${scopeSelectorText(selectorText, scopeSelector)} {`;
+        });
+      }
+
+      function absoluteSourceUrl(sourceUrl) {
+        try {
+          return new URL(sourceUrl, window.location.href).href;
+        } catch {
+          return sourceUrl;
+        }
+      }
+
+      function resolveCssUrls(cssText, sourceUrl) {
+        const baseUrl = absoluteSourceUrl(sourceUrl);
+        return cssText.replace(/url\(\s*(['"]?)(?!data:|blob:|https?:|#|\/)([^'")]+)\1\s*\)/gi, (match, quote, url) => {
+          try {
+            return `url(${quote}${new URL(url, baseUrl).href}${quote})`;
+          } catch {
+            return match;
+          }
+        });
+      }
+
+      function rewriteCssText(cssText, scopeId, sourceUrl) {
+        const scopeSelector = `[data-slide-scope="${scopeId}"]`;
+        const cssWithResolvedUrls = resolveCssUrls(cssText, sourceUrl);
+
+        try {
+          const sheet = new CSSStyleSheet();
+          sheet.replaceSync(cssWithResolvedUrls);
+          return rewriteCssRules(sheet.cssRules, scopeSelector);
+        } catch (error) {
+          console.warn("Falling back to simple CSS scoping", error);
+          return fallbackScopeCss(cssWithResolvedUrls, scopeSelector);
+        }
+      }
+
+      function absolutizeUrl(value, sourceUrl) {
+        if (!value || /^(data:|blob:|https?:|mailto:|#|\/)/i.test(value)) return value;
+
+        try {
+          return new URL(value, absoluteSourceUrl(sourceUrl)).href;
+        } catch {
+          return value;
+        }
+      }
+
+      function normalizeSlideDocument(fragmentHtml, scopeId, sourceUrl) {
+        const documentForSlide = new DOMParser().parseFromString(fragmentHtml, "text/html");
+
+        documentForSlide.querySelectorAll("script").forEach((node) => node.remove());
+        documentForSlide.querySelectorAll("[src]").forEach((node) => {
+          node.setAttribute("src", absolutizeUrl(node.getAttribute("src"), sourceUrl));
+        });
+        documentForSlide.querySelectorAll("[href]").forEach((node) => {
+          node.setAttribute("href", absolutizeUrl(node.getAttribute("href"), sourceUrl));
+        });
+
+        const cssText = Array.from(documentForSlide.querySelectorAll("style"))
+          .map((node) => node.textContent || "")
+          .join("\n");
+        documentForSlide.querySelectorAll("style").forEach((node) => node.remove());
+
+        const scopedStyle = cssText
+          ? `<style data-slide-scoped-style="${scopeId}">${rewriteCssText(cssText, scopeId, sourceUrl)}</style>`
+          : "";
+        return `${scopedStyle}${documentForSlide.body.innerHTML}`;
+      }
+
+      function mediaMarkup(slide) {
+        const source = sourceForSlide(slide);
+        const slideNo = escapeHtml(slide.no);
+        const slideUrl = escapeHtml(source.url);
+
+        if (source.kind === "html") {
+          const scopeId = slideScopeId(slide);
+          return `<div class="html-inline" data-width="${slide.width || 1920}" data-height="${slide.height || 1080}" data-frag="${slideUrl}" data-scope="${scopeId}"><div class="html-inline-holder" data-slide-scope="${scopeId}"></div></div>`;
+        }
+
+        return `<img src="${slideUrl}" alt="Slide ${slideNo}" decoding="async" />`;
+      }
+
+      function syncHtmlFrameScale() {
+        document.querySelectorAll(".html-inline").forEach((preview) => {
+          const holder = preview.querySelector(".html-inline-holder");
+          if (!holder) return;
+
+          const fragUrl = preview.dataset.frag;
+          if (fragUrl && preview.dataset.loaded !== fragUrl) {
+            preview.dataset.loaded = fragUrl;
+            fetch(fragUrl, { cache: "no-store" })
+              .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.text();
+              })
+              .then((fragmentHtml) => {
+                holder.innerHTML = normalizeSlideDocument(fragmentHtml, preview.dataset.scope, fragUrl);
+                syncHtmlFrameScale();
+              })
+              .catch(() => {
+                preview.dataset.loaded = "";
+                holder.innerHTML = '<div class="html-inline-error">Failed to load HTML preview.</div>';
+              });
+          }
+
+          const rect = preview.getBoundingClientRect();
+          const frameWidth = Number(preview.dataset.width) || 1920;
+          const frameHeight = Number(preview.dataset.height) || 1080;
+          const scale = Math.min(rect.width / frameWidth, rect.height / frameHeight);
+          holder.style.transform = `scale(${scale})`;
+        });
+      }
+
+      function scheduleHtmlFrameScale() {
+        requestAnimationFrame(syncHtmlFrameScale);
+      }
+
+      function setMode(mode) {
+        state.mode = mode;
+        wheelState.consumed = false;
+        wheelState.distance = 0;
+        wheelState.lastEvent = 0;
+        localStorage.setItem(`${storagePrefix}Mode`, mode);
+        app.classList.toggle("focus-mode", mode === "focus");
+        app.classList.toggle("deck-mode", mode === "deck");
+        focusButton.setAttribute("aria-pressed", String(mode === "focus"));
+        deckButton.setAttribute("aria-pressed", String(mode === "deck"));
+        scheduleHtmlFrameScale();
+      }
+
+      function setIndex(index) {
+        if (!state.slides.length) {
+          state.index = 0;
+          return;
+        }
+
+        const slideCount = state.slides.length;
+        state.index = (index + slideCount) % slideCount;
+        localStorage.setItem(`${storagePrefix}Index:${state.deckId}`, String(state.index));
+        renderActiveState();
+      }
+
+      function openSlide(index) {
+        setMode("focus");
+        setIndex(index);
+      }
+
+      function scrollActiveTabIntoView() {
+        const activeTab = jumpRoot.querySelector(`.slide-tab[data-index="${state.index}"]`);
+        if (!activeTab) {
+          syncSlideIndicator();
+          return;
+        }
+        // Scroll only the number strip; scrolling its ancestors would move the deck grid.
+        const left = activeTab.offsetLeft - 44;
+        const right = activeTab.offsetLeft + activeTab.offsetWidth + 44;
+        if (left < jumpRoot.scrollLeft) jumpRoot.scrollLeft = Math.max(0, left);
+        else if (right > jumpRoot.scrollLeft + jumpRoot.clientWidth) {
+          jumpRoot.scrollLeft = right - jumpRoot.clientWidth;
+        }
+        syncSlideIndicator({ navigation: true });
+      }
+
+      function renderActiveState() {
+        const active = state.slides[state.index];
+
+        document.querySelectorAll(".slide-card").forEach((node) => {
+          node.classList.toggle("is-active", node.dataset.index === String(state.index));
+        });
+
+        document.querySelectorAll(".slide-tab").forEach((node) => {
+          node.setAttribute("aria-current", String(node.dataset.index === String(state.index)));
+        });
+
+        requestAnimationFrame(scrollActiveTabIntoView);
+
+        if (active) {
+          history.replaceState(null, "", `#${active.id}`);
+        }
+        scheduleHtmlFrameScale();
+      }
+
+      function renderSlides() {
+        resetDockMagnification();
+        if (!state.slides.length) {
+          slidesRoot.innerHTML = '<div class="empty">Generated slides were not found.</div>';
+          jumpRoot.innerHTML = "";
+          renderActiveState();
+          return;
+        }
+
+        jumpRoot.innerHTML = state.slides
+          .map((slide, index) => {
+            return `<button class="slide-tab" type="button" data-index="${index}" aria-label="Слайд ${escapeHtml(slide.no)}"><span class="slide-number">${escapeHtml(slide.no)}</span></button>`;
+          })
+          .join("");
+
+        slidesRoot.innerHTML = state.slides
+          .map((slide, index) => {
+            return `
+              <section class="slide-card" style="--slide-width:${Number(slide.width) || 1920}px;--slide-height:${Number(slide.height) || 1080}px;--slide-aspect:${(Number(slide.width) || 1920) / (Number(slide.height) || 1080)}" id="${escapeHtml(slide.id)}" data-index="${index}" role="button" tabindex="0" aria-label="Open slide ${escapeHtml(slide.no)}">
+                <div class="stage">
+                  ${mediaMarkup(slide)}
+                </div>
+              </section>
+            `;
+          })
+          .join("");
+
+        document.querySelectorAll(".slide-tab").forEach((button) => {
+          button.addEventListener("click", () => {
+            openSlide(Number(button.dataset.index));
+          });
+        });
+
+        document.querySelectorAll(".slide-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            if (state.mode !== "deck") return;
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed && card.contains(selection.anchorNode)) return;
+            openSlide(Number(card.dataset.index));
+          });
+
+          card.addEventListener("keydown", (event) => {
+            if (state.mode !== "deck") return;
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            openSlide(Number(card.dataset.index));
+          });
+        });
+
+        renderActiveState();
+        scheduleHtmlFrameScale();
+      }
+
+      function deckSignature(deck) {
+        return [
+          deck.id,
+          deck.label,
+          deck.width, deck.height,
+          ...(deck.slides || []).map((slide) =>
+            `${slide.width}:${slide.height}:${slide.id}:${slide.file}:${slide.version}:${slide.htmlFile || ""}:${slide.htmlVersion || ""}`
+          ),
+        ].join("|");
+      }
+
+      function renderDeckOptions() {
+        deckSelect.innerHTML = state.decks
+          .map((deck) => `<option value="${escapeHtml(deck.id)}">${escapeHtml(deck.label)}</option>`)
+          .join("");
+        deckSelect.value = state.deckId;
+        const label = state.decks.find((deck) => deck.id === state.deckId)?.label || "Выбрать презентацию";
+        deckTitleNode.textContent = label;
+        deckSelect.title = label;
+      }
+
+      function updateDeckStatus() {
+        statusNode.textContent = state.generatedAt ? `Обновлено ${formatTime(state.generatedAt)}` : "";
+      }
+
+      function activateDeck(deckId, options = {}) {
+        const deck = state.decks.find((item) => item.id === deckId) || state.decks[0];
+        if (!deck) {
+          state.deckId = "";
+          state.slides = [];
+          state.index = 0;
+          renderDeckOptions();
+          renderSlides();
+          updateDeckStatus();
+          return;
+        }
+
+        const previousDeckId = state.deckId;
+        const previousActiveId = previousDeckId === deck.id ? state.slides[state.index]?.id : "";
+        state.deckId = deck.id;
+        app.style.setProperty("--slide-aspect", (deck.width || 1920) / (deck.height || 1080));
+        wheelState.consumed = false;
+        wheelState.lastEvent = 0;
+        wheelState.distance = 0;
+        state.slides = deck.slides || [];
+        state.signature = deckSignature(deck);
+        localStorage.setItem(`${storagePrefix}Deck`, state.deckId);
+        renderDeckOptions();
+
+        const preferredId = options.preferredSlideId || previousActiveId;
+        const preferredIndex = state.slides.findIndex((slide) => slide.id === preferredId);
+        const legacyIndex = state.deckId === config.legacyDeckId ? localStorage.getItem(`${storagePrefix}Index`) : null;
+        const storedIndex = Number(
+          localStorage.getItem(`${storagePrefix}Index:${state.deckId}`) || legacyIndex || 0
+        );
+        state.index = preferredIndex >= 0
+          ? preferredIndex
+          : Math.min(storedIndex, Math.max(state.slides.length - 1, 0));
+
+        app.classList.toggle("many-slides", state.slides.length >= 24);
+        renderSlides();
+        updateDeckStatus();
+      }
+
+      async function loadSlides() {
+        if (state.requestInFlight) return;
+        state.requestInFlight = true;
+
+        try {
+          const response = await fetch(`/api/decks?ts=${Date.now()}`, {
+            cache: "no-store",
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const payload = await response.json();
+          const decks = payload.decks || [];
+          const signature = decks.map(deckSignature).join("||");
+
+          app.classList.remove("is-loading");
+          state.generatedAt = payload.generatedAt;
+
+          if (signature !== state.decksSignature) {
+            const activeId = state.slides[state.index]?.id || "";
+            const hashId = location.hash.slice(1);
+            state.decks = decks;
+            state.decksSignature = signature;
+
+            const hashDeck = decks.find((deck) => (deck.slides || []).some((slide) => slide.id === hashId));
+            const savedDeck = decks.find((deck) => deck.id === state.deckId);
+            const targetDeck = hashDeck || savedDeck || decks[0];
+            const preferredSlideId = hashDeck ? hashId : activeId;
+
+            activateDeck(targetDeck?.id, { preferredSlideId });
+          } else {
+            updateDeckStatus();
+          }
+        } catch (error) {
+          app.classList.remove("is-loading");
+          statusNode.textContent = `Сервер недоступен: ${error.message}`;
+        } finally {
+          state.requestInFlight = false;
+        }
+      }
+
+      deckSelect.addEventListener("change", () => activateDeck(deckSelect.value));
+      focusButton.addEventListener("click", () => setMode("focus"));
+      deckButton.addEventListener("click", () => setMode("deck"));
+      window.addEventListener("resize", () => {
+        resetDockMagnification();
+        requestAnimationFrame(scrollActiveTabIntoView);
+        syncViewerHeight();
+      });
+
+      app.addEventListener("wheel", (event) => {
+        if (state.mode !== "focus" || state.slides.length < 2) return;
+        if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+        if (event.target.closest(".topbar, .slide-dock, input, select, textarea, button, a, [contenteditable], [role='slider']")) return;
+        const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+        if (!delta) return;
+        event.preventDefault();
+        const now = performance.now();
+        const direction = Math.sign(delta);
+        if (now - wheelState.lastEvent > 180 || direction !== wheelState.direction) {
+          wheelState.distance = 0;
+          wheelState.consumed = false;
+        }
+        wheelState.lastEvent = now;
+        wheelState.direction = direction;
+        if (wheelState.consumed) return;
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+        wheelState.distance += Math.abs(delta) * unit;
+        if (wheelState.distance < 32) return;
+        wheelState.consumed = true;
+        setIndex(state.index + direction);
+      }, { passive: false });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.defaultPrevented) return;
+        if (event.target.closest("input, select, textarea, [contenteditable]")) return;
+        if (event.key === " " && event.target.closest("button, a")) return;
+
+        if (event.key === "ArrowLeft" || event.key === "PageUp") {
+          event.preventDefault();
+          setMode("focus");
+          setIndex(state.index - 1);
+        }
+
+        if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+          event.preventDefault();
+          setMode("focus");
+          setIndex(state.index + 1);
+        }
+      });
+
+      window.addEventListener("hashchange", () => {
+        const hash = location.hash.slice(1);
+        const targetDeck = state.decks.find((deck) =>
+          (deck.slides || []).some((slide) => slide.id === hash)
+        );
+        if (targetDeck && targetDeck.id !== state.deckId) {
+          activateDeck(targetDeck.id, { preferredSlideId: hash });
+          return;
+        }
+        const index = state.slides.findIndex((slide) => slide.id === hash);
+        if (index >= 0) setIndex(index);
+      });
+
+      setMode(state.mode === "deck" ? "deck" : "focus");
+      loadSlides();
+      setInterval(loadSlides, 1000);
+    </script>
+  </body>
+</html>
