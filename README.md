@@ -7,13 +7,15 @@ Deckloom is MIT licensed. It includes no product slides, corporate assets or pri
 ## Installation
 
 ```sh
-npm install deckloom@0.2.0 --save-exact
+npm install deckloom@0.2.1 --save-exact
 npx playwright install chromium
 ```
 
 Playwright is a peer dependency. Declare it in your application as well if you use its API directly. Node.js 22 or later is required. Installation from the public npm registry does not require an access token.
 
 ## Local development
+
+Version 0.2.1 replaces toolbar artwork with individually vendored Lucide SVG geometry and shows a loading spinner on the download button during export. See the [patch release notes](docs/releases/0.2.1.md).
 
 For ongoing roadmap work, start with [the project state and continuation guide](docs/current-state.md), then follow its links to decisions and acceptance records.
 

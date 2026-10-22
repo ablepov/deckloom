@@ -1,0 +1,32 @@
+{
+  "library": "Lucide",
+  "commit": "20aef31db93fe4d9f398dbb15b120d99c48eef95",
+  "storage": "SVG markup inlined in viewer/index.html; no runtime library dependency",
+  "icons": [
+    {
+      "name": "layers",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/20aef31db93fe4d9f398dbb15b120d99c48eef95/icons/layers.svg",
+      "sha256": "ce16d0a955e3581cda17f6b2fd5c5bc2034b405f9cecc31c8ebb8495b4afc1bb"
+    },
+    {
+      "name": "layout-grid",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/20aef31db93fe4d9f398dbb15b120d99c48eef95/icons/layout-grid.svg",
+      "sha256": "b8903f61d09b1d75e55c71158277d26570962f69c2099446a251871e0a2d6678"
+    },
+    {
+      "name": "download",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/20aef31db93fe4d9f398dbb15b120d99c48eef95/icons/download.svg",
+      "sha256": "3daeee13ded5a3afa2198b1bb4e2262d163922f97d96ac6ff9953e8ed4fe039d"
+    },
+    {
+      "name": "loader-circle",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/20aef31db93fe4d9f398dbb15b120d99c48eef95/icons/loader-circle.svg",
+      "sha256": "043021bb903919668804bdb6fee0342072e4ffea5f03fbd857774c440179ad3b"
+    },
+    {
+      "name": "chevron-down",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/20aef31db93fe4d9f398dbb15b120d99c48eef95/icons/chevron-down.svg",
+      "sha256": "66ea878e72ed3488bb3b464c39dfdccee8d1f78e560dccea40e5e12da0e87e87"
+    }
+  ]
+}

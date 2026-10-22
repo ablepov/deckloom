@@ -1,6 +1,6 @@
 {
   "name": "deckloom",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A local HTML presentation viewer, renderer and layout diagnostics engine",
   "license": "MIT",
   "repository": {
@@ -49,7 +49,7 @@
     "check:baseline": "node scripts/check-baseline.cjs",
     "check:baseline:ci": "node scripts/check-baseline.cjs --large=24",
     "check:package": "node scripts/check-package.cjs",
-    "check:package:published": "node scripts/check-package.cjs --published=0.2.0",
+    "check:package:published": "node scripts/check-package.cjs --published=0.2.1",
     "check:export": "node scripts/check-export.cjs",
     "check:pptx": "node scripts/check-pptx.cjs",
     "check:engine": "node scripts/check-engine.cjs",
