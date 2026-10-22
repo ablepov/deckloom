@@ -89,7 +89,7 @@ test('rendered decks survive server, viewer, dimensions and layout diagnostics',
       assert(result[0].consoleMessages > 0);
       const report = await fs.readFile(result[0].qa, 'utf8');
       assert(report.includes('Expected test failure'));
-      await assert.rejects(broken.renderDeck(browser, { ...project.decks[0], slides: [{ no: '../escape' }] }), /Invalid artifact name/);
+      await assert.rejects(broken.renderDeck(browser, { ...project.decks[0], slides: [{ no: '../escape' }] }), { code: 'INVALID_ID' });
     });
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

@@ -1,0 +1,40 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const {chromium}=require('playwright');
+const {measure}=require('../src/pptx-semantic.cjs');
+const fixture=require('./fixtures/font-transport.json');
+const hints={root:'main',text:'.copy',atomic:'.diagram',groups:'.card',centeredText:'.badge',intrinsicText:'.label',imageComponents:'.logo'};
+const html=`<style>@font-face{font-family:Example;src:url(data:font/ttf;base64,${fixture.faces[0].data})}*{box-sizing:border-box}html,body{margin:0}main{width:960px;height:540px;background:white;font-family:Example}.card{width:400px;padding:20px;display:flex;flex-direction:column;align-items:flex-start;background:#eee;border-radius:12px}.copy{margin:0;font-size:32px;line-height:40px}.label{white-space:nowrap}.diagram{width:100px;height:80px;box-shadow:0 3px 6px rgba(0,0,0,.2)}.diagram span{display:block;transform:scale(.8);background:linear-gradient(red,blue)}.hidden{display:none}</style><main><section class=card><p class=copy>AV</p><p class="copy label">AV</p></section><div class=diagram><span>complex AV</span></div><div class=hidden>ignored AV</div></main>`;
+test('semantic capture uses CSS flow constraints, white-space and declared local scene roles',async()=>{
+  const browser=await chromium.launch();
+  try{
+    const page=await browser.newPage({viewport:{width:960,height:540}});await page.setContent(html);await page.evaluate(()=>document.fonts.ready);
+    const scene=await page.evaluate(measure,hints);assert.deepEqual(scene.errors,[]);
+    const texts=scene.elements.filter(o=>o.kind==='text');assert.equal(texts.length,2);
+    assert.ok(texts[0].measuredContent.w<50);assert.equal(texts[0].w,360);assert.equal(texts[0].intrinsicLabel,false);
+    assert.equal(texts[1].intrinsicLabel,true);assert.equal(scene.groups.length,1);
+    assert.equal(scene.elements.filter(o=>o.kind==='atomic-image').length,1);
+    assert.equal(scene.elements.find(o=>o.kind==='atomic-image').containsText,true);
+    assert.ok(!Object.hasOwn(texts[0],'baselineInset'),'Capture must not guess a native font baseline');
+    await page.locator('main').evaluate(n=>n.insertAdjacentHTML('beforeend','<div style="display:flex;width:600px;gap:20px"><svg width="32" height="32"></svg><div style="display:flex;flex-direction:column"><p class="copy">AV</p></div></div>'));
+    const nested=await page.evaluate(measure,hints);
+    assert.equal(nested.elements.filter(o=>o.kind==='text').at(-1).w,548,'Auto wrappers must inherit the remaining row width');
+    await page.locator('main').evaluate(n=>n.insertAdjacentHTML('beforeend','<p class="copy"> A <span> B</span> <span style="display:none">HIDDEN</span><span style="visibility:hidden">HIDDEN</span> </p>'));
+    const collapsed=(await page.evaluate(measure,hints)).elements.filter(o=>o.kind==='text').at(-1);
+    assert.equal(collapsed.runs.map(r=>r.text).join(''),'A B');
+    await page.locator('main > p').evaluate(n=>{n.innerHTML='AV AV <b>AV</b> AV';n.style.width='50px'});
+    const wrapped=(await page.evaluate(measure,hints)).elements.filter(o=>o.kind==='text').at(-1);
+    assert.ok(wrapped.sourceLines>1);assert.equal(wrapped.runs.map(r=>r.text).join(''),'AV AV AV AV');
+    await page.locator('main > p').evaluate(n=>n.innerHTML='A<span style="font-size:48px">B</span>');
+    await assert.rejects(()=>page.evaluate(measure,hints),/Mixed inline font metrics/);
+    await page.locator('main > p').evaluate(n=>{n.textContent=' A \n B ';n.style.whiteSpace='pre-line'});
+    assert.equal((await page.evaluate(measure,hints)).elements.filter(o=>o.kind==='text').at(-1).runs.map(r=>r.text).join(''),'A\nB');
+    await page.locator('main > p').evaluate(n=>n.style.whiteSpace='break-spaces');
+    await assert.rejects(()=>page.evaluate(measure,hints),/Unsupported white-space/);
+    await page.locator('main > p').evaluate(n=>n.remove());
+    await page.locator('main').evaluate(n=>n.append(document.createTextNode('unclassified AV')));
+    assert.ok((await page.evaluate(measure,hints)).errors.some(e=>e.startsWith('Uncovered text:')));
+    await page.setContent(html);await page.evaluate(()=>document.fonts.ready);
+    await assert.rejects(()=>page.evaluate(measure,{...hints,atomic:'main'}),/Whole-slide raster/);
+    await assert.rejects(()=>page.evaluate(measure,{...hints,atomic:'.absent'}),/Unclassified paint effect/);
+  }finally{await browser.close()}
+});

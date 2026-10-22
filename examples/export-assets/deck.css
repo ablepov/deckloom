@@ -1,0 +1,7 @@
+@import "palette.css";
+@font-face{font-family:DeckloomExport;src:url("DejaVuSans.ttf") format("truetype");font-style:normal;font-weight:400}
+html,body{margin:0}
+.slide{box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:24px;color:#17221c;font:22px/1.4 DeckloomExport,sans-serif;print-color-adjust:exact!important}
+h1{font:400 32px/1.15 DeckloomExport,sans-serif;margin:0}
+p{margin:0}
+img{margin-top:auto}

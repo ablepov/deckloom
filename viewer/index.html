@@ -134,6 +134,25 @@
         gap: 2px;
       }
 
+      .header-actions { display: flex; align-items: center; gap: 14px; }
+      .download-control { position: relative; }
+      .button.download-trigger { width: auto; gap: 7px; padding: 0 10px; color: var(--text); border: 1px solid var(--line); }
+      .download-trigger:disabled { opacity: .45; cursor: default; }
+      .download-trigger[aria-expanded="true"] { background: var(--panel-strong); border-color: var(--line-strong); }
+      .download-trigger .chevron { width: 12px; height: 12px; }
+      .download-menu { position: absolute; top: calc(100% + 8px); right: 0; width: min(310px, calc(100vw - 28px)); padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: 0 12px 32px #0006; z-index: 40; }
+      [hidden] { display: none !important; }
+      .download-item { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; width: 100%; min-height: 40px; padding: 10px; border: 0; border-radius: 6px; text-align: left; color: var(--text); background: transparent; cursor: pointer; font-size: 13px; }
+      .download-item:hover:not(:disabled), .download-item:focus-visible { background: var(--panel-strong); outline: 1px solid var(--line-strong); outline-offset: -1px; }
+      .download-item:disabled { color: var(--muted); cursor: default; }
+      .download-item small { flex-basis: 100%; font-size: 11px; color: var(--muted); }
+      .download-item.google { border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; margin-top: 4px; padding-top: 13px; }
+      .beta { padding: 2px 5px; border-radius: 4px; font-size: 10px; line-height: 1.2; color: var(--accent); background: #efae7214; }
+      .download-notice { position: fixed; z-index: 35; top: calc(var(--topbar-height) + 8px); right: 24px; width: min(360px, calc(100vw - 28px)); padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 8px 24px #0005; font-size: 12px; line-height: 1.5; }
+      .download-notice p { margin: 0; overflow-wrap: anywhere; }
+      .download-notice a, .download-notice button { display: inline-block; margin: 6px 12px 0 0; padding: 0; border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; }
+      .download-notice button:focus-visible, .download-notice a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
       .button,
       .slide-tab {
         border: 0;
@@ -381,6 +400,8 @@
         text-align: center;
       }
 
+      .html-document-frame { width: 100%; height: 100%; border: 0; display: block; background: white; }
+
       .app.focus-mode > main {
         width: min(100%, 1720px);
         min-height: calc(100dvh - var(--topbar-height) - 84px);
@@ -447,6 +468,9 @@
         .deck-title {
           font-size: 18px;
         }
+        .header-actions { gap: 6px; }
+        .download-trigger span { display: none; }
+        .download-notice { right: 14px; }
 
         .slide-head {
           display: grid;
@@ -487,11 +511,21 @@
           <div class="status" id="status">Загрузка слайдов…</div>
         </div>
 
-        <div class="mode-group" role="group" aria-label="Режим просмотра">
+        <div class="header-actions"><div class="mode-group" role="group" aria-label="Режим просмотра">
           <button class="button" type="button" id="focusMode" aria-label="Листать" title="Листать — стрелками или колёсиком" aria-pressed="true"></button>
           <button class="button" type="button" id="deckMode" aria-label="Обзор" title="Обзор всех слайдов" aria-pressed="false"></button>
         </div>
+        <div class="download-control" id="downloadControl">
+          <button class="button download-trigger" id="downloadButton" type="button" aria-label="Скачать выбранную колоду" title="Скачать выбранную колоду" aria-haspopup="menu" aria-expanded="false" aria-controls="downloadMenu" disabled></button>
+          <div class="download-menu" id="downloadMenu" role="menu" aria-label="Скачать выбранную колоду" hidden>
+            <button class="download-item" type="button" role="menuitem" tabindex="-1" data-download="pdf">Скачать PDF</button>
+            <button class="download-item" type="button" role="menuitem" tabindex="-1" data-download="pptx">Скачать PPTX</button>
+            <button class="download-item" type="button" role="menuitem" tabindex="-1" data-download="pptx-fonts">Скачать PPTX со шрифтами <small>ZIP-архив с файлами для установки</small></button>
+            <button class="download-item google" type="button" role="menuitem" tabindex="-1" disabled aria-disabled="true" title="Интеграция появится позже">Открыть в Google Презентациях <span class="beta">Бета</span><small>Скоро. Пока недоступно</small></button>
+          </div>
+        </div></div>
       </header>
+      <div class="download-notice" id="downloadNotice" role="status" aria-live="polite" hidden></div>
 
       <main>
         <div class="slides" id="slides"></div>
@@ -505,6 +539,7 @@
 
     <script>window.deckloomConfig = __DECKLOOM_CONFIG__;</script>
     <script>
+      const inspectStaticDocument = __DECKLOOM_PROFILE__;
       const app = document.getElementById("app");
       const deckSelect = document.getElementById("deckSelect");
       const deckTitleNode = document.getElementById("deckTitle");
@@ -515,6 +550,11 @@
       const statusNode = document.getElementById("status");
       const focusButton = document.getElementById("focusMode");
       const deckButton = document.getElementById("deckMode");
+      const downloadButton = document.getElementById('downloadButton');
+      const downloadMenu = document.getElementById('downloadMenu');
+      const downloadControl = document.getElementById('downloadControl');
+      const downloadNotice = document.getElementById('downloadNotice');
+      const downloadState = { busy:false, capabilities:[], failed:null };
 
       const config = window.deckloomConfig || {};
       const storagePrefix = config.storagePrefix || "deckloom";
@@ -525,7 +565,9 @@
         index: 0,
         mode: localStorage.getItem(`${storagePrefix}Mode`) || "focus",
         signature: "",
-        decksSignature: "",
+        decksSignature: null,
+        contractVersion: 0,
+        project: null,
         generatedAt: "",
         requestInFlight: false,
       };
@@ -633,6 +675,7 @@
           "M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.251 2.251 0 0 0 4.5 9v.878m13.5-3A2.251 2.251 0 0 1 19.5 9v.878m0 0a2.25 2.25 0 0 1-.75.128H5.25a2.25 2.25 0 0 1-.75-.128m15 0V18A2.25 2.25 0 0 1 17.25 20.25H6.75A2.25 2.25 0 0 1 4.5 18V9.878",
         squares:
           "M3.75 3.75v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm6-12v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm6-12v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Zm0 6v4.5h4.5v-4.5h-4.5Z",
+        download: 'M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4',
       };
 
       function icon(kind) {
@@ -641,6 +684,72 @@
 
       focusButton.innerHTML = icon("rectangleStack");
       deckButton.innerHTML = icon("squares");
+      downloadButton.innerHTML = icon('download')+'<span>Скачать</span><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+      function closeDownloadMenu(restoreFocus=false) {
+        downloadMenu.hidden=true;downloadButton.setAttribute('aria-expanded','false');
+        if(restoreFocus)downloadButton.focus();
+      }
+      function syncDownloads() {
+        const capability=downloadState.capabilities.find(c=>c.deckId===state.deckId);
+        downloadButton.disabled=downloadState.busy||!capability?.pdf||!state.slides.length;
+        downloadButton.setAttribute('aria-busy',String(downloadState.busy));
+        for(const item of downloadMenu.querySelectorAll('[data-download]')){
+          const available=item.dataset.download==='pdf'?capability?.pdf:item.dataset.download==='pptx'?capability?.pptx:capability?.fonts;
+          item.disabled=!available;
+          item.title=available?'':item.dataset.download==='pptx-fonts'?'Установочные шрифты для этой колоды пока не настроены':'Экспорт этой колоды пока не поддерживается';
+        }
+        if(downloadButton.disabled)closeDownloadMenu();
+      }
+      function showDownloadNotice(text,options={}) {
+        if(options.progress){const p=downloadNotice.querySelector('p');if(p&&p.textContent!==text)p.textContent=text;return;}
+        downloadNotice.replaceChildren();const p=document.createElement('p');p.textContent=text;downloadNotice.append(p);
+        if(options.url){const a=document.createElement('a');a.href=options.url;a.download=options.filename;a.textContent='Скачать ещё раз';downloadNotice.append(a);}
+        if(options.retry){const retry=document.createElement('button');retry.type='button';retry.textContent='Повторить';retry.onclick=()=>startDownload(options.retry.format,options.retry.deckId);downloadNotice.append(retry);}
+        const hide=document.createElement('button');hide.type='button';hide.textContent='Скрыть';hide.onclick=()=>downloadNotice.hidden=true;downloadNotice.append(hide);downloadNotice.hidden=false;
+      }
+      async function startDownload(format,deckId=state.deckId) {
+        if(downloadState.busy)return;
+        const deck=state.decks.find(d=>d.id===deckId);if(!deck)return;
+        const kind=format==='pdf'?'PDF':format==='pptx'?'PPTX':'ZIP со шрифтами';
+        closeDownloadMenu(true);downloadState.busy=true;syncDownloads();
+        showDownloadNotice(`Готовим ${kind} · ${deck.label}…`);
+        try{
+          const response=await fetch('/api/downloads',{method:'POST',signal:AbortSignal.timeout(30000),headers:{'Content-Type':'application/json','X-Deckloom-Token':config.downloadToken},body:JSON.stringify({deckId,format})});
+          let job=await response.json();if(!response.ok)throw Object.assign(new Error('Export failed'),{code:job.code});
+          const deadline=Date.now()+15*60*1000;
+          while(!['complete','failed'].includes(job.state)){
+            if(Date.now()>deadline)throw new Error('Export timed out');
+            await new Promise(resolve=>setTimeout(resolve,700));
+            const poll=await fetch(`/api/downloads/${job.id}`,{cache:'no-store',signal:AbortSignal.timeout(30000)});if(!poll.ok)throw new Error('Export status unavailable');job=await poll.json();
+            if(job.progress?.stage==='render')showDownloadNotice(`Готовим ${kind} · ${deck.label}: ${job.progress.completed} из ${job.progress.total} слайдов`,{progress:true});
+            else if(job.progress?.stage==='pptx')showDownloadNotice(`Собираем ${kind} · ${deck.label}…`,{progress:true});
+          }
+          if(job.state==='failed')throw Object.assign(new Error('Export failed'),job.error);
+          const a=document.createElement('a');a.href=job.url;a.download=job.filename;document.body.append(a);a.click();a.remove();
+          showDownloadNotice(`${kind} готов · ${deck.label}`,{url:job.url,filename:job.filename});
+        }catch(error){
+          const reason=error.code==='DOWNLOAD_BUSY'?'Другая колода уже экспортируется. Дождитесь завершения.':error.code==='PPTX_UNSUPPORTED_CANVAS'||error.code?.startsWith('PPTX_UNSUPPORTED')?'Эта композиция пока не поддерживается в PPTX.':error.code==='FONT_PACKAGE_UNAVAILABLE'||error.code==='FONT_REDISTRIBUTION_UNCONFIRMED'?'Установочные шрифты для этой колоды пока недоступны.':'Попробуйте ещё раз.';
+          showDownloadNotice(`Не удалось подготовить ${kind} · ${deck.label}. ${reason}`,{retry:{format,deckId}});
+        }finally{downloadState.busy=false;syncDownloads();}
+      }
+      downloadButton.addEventListener('click',()=>{
+        if(!downloadMenu.hidden)return closeDownloadMenu();
+        downloadMenu.hidden=false;downloadButton.setAttribute('aria-expanded','true');downloadMenu.querySelector('button:not(:disabled)')?.focus();
+      });
+      downloadButton.addEventListener('keydown',event=>{
+        if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();downloadMenu.hidden=false;downloadButton.setAttribute('aria-expanded','true');const items=[...downloadMenu.querySelectorAll('button:not(:disabled)')];(event.key==='ArrowUp'?items.at(-1):items[0])?.focus();}
+      });
+      downloadMenu.addEventListener('click',event=>{const item=event.target.closest('[data-download]');if(item&&!item.disabled)startDownload(item.dataset.download);});
+      downloadMenu.addEventListener('keydown',event=>{
+        const items=[...downloadMenu.querySelectorAll('button:not(:disabled)')],index=items.indexOf(document.activeElement);
+        if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowDown'?1:-1)+items.length)%items.length;items[next]?.focus();}
+        if(event.key==='Escape'){event.preventDefault();closeDownloadMenu(true);}
+        if(event.key==='Tab')closeDownloadMenu(true);
+      });
+      document.addEventListener('pointerdown',event=>{if(!downloadControl.contains(event.target))closeDownloadMenu();});
+      window.addEventListener('blur',()=>closeDownloadMenu());
+      fetch('/api/downloads',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{downloadState.capabilities=data.decks||[];syncDownloads();}).catch(()=>{});
 
       function fileLabel(file) {
         return file.replace(/\.(png|jpe?g|webp|html)$/i, "");
@@ -667,6 +776,14 @@
       }
 
       function sourceForSlide(slide) {
+        if (state.contractVersion === 1) {
+          const { html, png } = slide.artifacts;
+          if (html.state === "available") return { kind: "html", url: html.url };
+          if (html.state === "unreadable") return { kind: "unavailable", message: "HTML preview is unavailable." };
+          if (png.state === "available") return { kind: "image", url: png.url };
+          return { kind: "unavailable", message: png.state === "unreadable" ? "Preview is unavailable." : "Preview has not been generated." };
+        }
+        if (slide.htmlError) return { kind: "unavailable", message: "HTML preview is unavailable." };
         if (slide.htmlUrl) {
           return {
             kind: "html",
@@ -676,12 +793,35 @@
           };
         }
 
+        if (slide.imageError) return { kind: "unavailable", message: "Preview is unavailable." };
+        if (!slide.url) return { kind: "unavailable", message: "Preview has not been generated." };
         return {
           kind: "image",
           url: slide.url,
           file: slide.file,
           modifiedAt: slide.modifiedAt,
         };
+      }
+
+      function displayNumber(slide) {
+        return state.contractVersion === 1 ? slide.number : slide.no;
+      }
+
+      function slideHash(slide) {
+        if (state.contractVersion !== 1) return `#${slide.id}`;
+        return `#project/${state.project.id}/deck/${state.deckId}/slide/${slide.id}`;
+      }
+
+      function hashTarget(decks) {
+        if (state.contractVersion === 1) {
+          const match = location.hash.match(/^#project\/([^/]+)\/deck\/([^/]+)(?:\/slide\/([^/]+))?$/);
+          if (!match || match[1] !== state.project.id) return null;
+          const deck = decks.find(item => item.id === match[2]);
+          return deck && (!match[3] || deck.slides.some(slide => slide.id === match[3])) ? { deck, slideId: match[3] || "" } : null;
+        }
+        const id = location.hash.slice(1);
+        const deck = decks.find(item => item.slides.some(slide => slide.id === id));
+        return deck ? { deck, slideId: id } : null;
       }
 
       function slideScopeId(slide) {
@@ -858,9 +998,52 @@
         return `${scopedStyle}${documentForSlide.body.innerHTML}`;
       }
 
+      function staticSlideDocument(html, sourceUrl) {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        if (inspectStaticDocument(doc).length) throw new Error('HTML requires static preparation');
+        let base = doc.querySelector('base[href]');
+        if (base && new URL(base.getAttribute('href'), absoluteSourceUrl(sourceUrl)).protocol === 'file:') throw new Error('File base cannot be previewed over HTTP');
+        if (!base) { base = doc.createElement('base'); base.href = absoluteSourceUrl(sourceUrl); doc.head.prepend(base); }
+        else base.href = new URL(base.getAttribute('href'), absoluteSourceUrl(sourceUrl)).href;
+        return '<!doctype html>' + doc.documentElement.outerHTML;
+      }
+
+      async function loadDocumentFrame(holder, html, sourceUrl) {
+        const frame = document.createElement('iframe');
+        frame.className = 'html-document-frame'; frame.title = 'Slide preview';
+        frame.setAttribute('sandbox', 'allow-same-origin'); frame.setAttribute('scrolling', 'no');
+        frame.style.visibility = 'hidden'; frame.style.position = 'absolute'; frame.style.inset = '0';
+        const documentHtml = staticSlideDocument(html, sourceUrl);
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => { frame.remove(); reject(new Error('HTML preview timeout')); }, 30000);
+          frame.onload = async () => {
+            try {
+              const doc = frame.contentDocument;
+              if (!doc) throw new Error('Unavailable preview document');
+              await doc.fonts?.ready;
+              const images = await Promise.all([...doc.images].map(image => image.decode().then(() => true, () => false)));
+              if (inspectStaticDocument(doc).length) throw new Error('HTML requires static preparation');
+              if (images.some(loaded => !loaded) || [...doc.fonts].some(font => font.status === 'error') ||
+                [...doc.querySelectorAll('link[rel="stylesheet"]')].some(link => !link.sheet)) throw new Error('HTML resource failed');
+              const failedResource = frame.contentWindow.performance.getEntriesByType('resource').some(entry => {
+                const url = new URL(entry.name, location.href);
+                return entry.responseStatus >= 400 || entry.responseStatus === 0 && url.origin === location.origin && /^https?:$/.test(url.protocol);
+              });
+              if (failedResource) throw new Error('HTML resource failed');
+              frame.style.visibility = '';
+              [...holder.children].forEach(child => { if (child !== frame) child.remove(); });
+              resolve();
+            } catch (error) { frame.remove(); reject(error); }
+            finally { clearTimeout(timeout); }
+          };
+          frame.srcdoc = documentHtml; holder.append(frame);
+        });
+      }
+
       function mediaMarkup(slide) {
         const source = sourceForSlide(slide);
-        const slideNo = escapeHtml(slide.no);
+        const slideNo = escapeHtml(displayNumber(slide));
+        if (source.kind === "unavailable") return `<div class="html-inline-error" role="status">${escapeHtml(source.message)}</div>`;
         const slideUrl = escapeHtml(source.url);
 
         if (source.kind === "html") {
@@ -868,7 +1051,7 @@
           return `<div class="html-inline" data-width="${slide.width || 1920}" data-height="${slide.height || 1080}" data-frag="${slideUrl}" data-scope="${scopeId}"><div class="html-inline-holder" data-slide-scope="${scopeId}"></div></div>`;
         }
 
-        return `<img src="${slideUrl}" alt="Slide ${slideNo}" decoding="async" />`;
+        return `<img data-preview-image data-preview-source="${slideUrl}" src="${slideUrl}" alt="Slide ${slideNo}" decoding="async" />`;
       }
 
       function syncHtmlFrameScale() {
@@ -879,19 +1062,24 @@
           const fragUrl = preview.dataset.frag;
           if (fragUrl && preview.dataset.loaded !== fragUrl) {
             preview.dataset.loaded = fragUrl;
-            fetch(fragUrl, { cache: "no-store" })
+            preview.dataset.pending = "true";
+            fetch(fragUrl, { cache: "no-store", signal: AbortSignal.timeout(30000) })
               .then((response) => {
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return response.text();
               })
-              .then((fragmentHtml) => {
-                holder.innerHTML = normalizeSlideDocument(fragmentHtml, preview.dataset.scope, fragUrl);
+              .then(async (fragmentHtml) => {
+                if (!fragmentHtml.trim()) throw new Error("Empty HTML preview");
+                if (state.contractVersion === 1) await loadDocumentFrame(holder, fragmentHtml, fragUrl);
+                else holder.innerHTML = normalizeSlideDocument(fragmentHtml, preview.dataset.scope, fragUrl);
+                delete preview.dataset.failed;
                 syncHtmlFrameScale();
               })
               .catch(() => {
-                preview.dataset.loaded = "";
-                holder.innerHTML = '<div class="html-inline-error">Failed to load HTML preview.</div>';
-              });
+                preview.dataset.failed = "true";
+                holder.innerHTML = '<div class="html-inline-error" role="alert">Failed to load HTML preview.</div>';
+              })
+              .finally(() => { delete preview.dataset.pending; });
           }
 
           const rect = preview.getBoundingClientRect();
@@ -904,6 +1092,22 @@
 
       function scheduleHtmlFrameScale() {
         requestAnimationFrame(syncHtmlFrameScale);
+      }
+
+      function retryPreviewFailures() {
+        // Retry only after a healthy API poll, at most once per poll and URL.
+        // Keep the current error visible while the next request is pending.
+        document.querySelectorAll('.html-inline[data-failed="true"]').forEach(preview => {
+          if (!preview.dataset.pending) preview.dataset.loaded = "";
+        });
+        document.querySelectorAll('.stage > img[data-preview-image][data-failed="true"]').forEach(image => {
+          if (image.dataset.retrying) return;
+          image.dataset.retrying = "true";
+          const url = new URL(image.dataset.previewSource, location.href);
+          url.searchParams.set("previewRetry", String(Date.now()));
+          image.src = url.href;
+        });
+        scheduleHtmlFrameScale();
       }
 
       function setMode(mode) {
@@ -928,6 +1132,7 @@
         const slideCount = state.slides.length;
         state.index = (index + slideCount) % slideCount;
         localStorage.setItem(`${storagePrefix}Index:${state.deckId}`, String(state.index));
+        if (state.contractVersion === 1) localStorage.setItem(`${storagePrefix}Slide:${state.deckId}`, state.slides[state.index].id);
         renderActiveState();
       }
 
@@ -966,7 +1171,10 @@
         requestAnimationFrame(scrollActiveTabIntoView);
 
         if (active) {
-          history.replaceState(null, "", `#${active.id}`);
+          history.replaceState(null, "", slideHash(active));
+        } else if (state.contractVersion === 1) {
+          const hash = state.deckId ? `#project/${state.project.id}/deck/${state.deckId}` : "";
+          history.replaceState(null, "", location.pathname + location.search + hash);
         }
         scheduleHtmlFrameScale();
       }
@@ -974,7 +1182,7 @@
       function renderSlides() {
         resetDockMagnification();
         if (!state.slides.length) {
-          slidesRoot.innerHTML = '<div class="empty">Generated slides were not found.</div>';
+          slidesRoot.innerHTML = `<div class="empty">${state.decks.length ? "This presentation has no slides." : "This project has no presentations."}</div>`;
           jumpRoot.innerHTML = "";
           renderActiveState();
           return;
@@ -982,14 +1190,14 @@
 
         jumpRoot.innerHTML = state.slides
           .map((slide, index) => {
-            return `<button class="slide-tab" type="button" data-index="${index}" aria-label="Слайд ${escapeHtml(slide.no)}"><span class="slide-number">${escapeHtml(slide.no)}</span></button>`;
+            return `<button class="slide-tab" type="button" data-index="${index}" aria-label="Слайд ${escapeHtml(displayNumber(slide))}"><span class="slide-number">${escapeHtml(displayNumber(slide))}</span></button>`;
           })
           .join("");
 
         slidesRoot.innerHTML = state.slides
           .map((slide, index) => {
             return `
-              <section class="slide-card" style="--slide-width:${Number(slide.width) || 1920}px;--slide-height:${Number(slide.height) || 1080}px;--slide-aspect:${(Number(slide.width) || 1920) / (Number(slide.height) || 1080)}" id="${escapeHtml(slide.id)}" data-index="${index}" role="button" tabindex="0" aria-label="Open slide ${escapeHtml(slide.no)}">
+              <section class="slide-card" style="--slide-width:${Number(slide.width) || 1920}px;--slide-height:${Number(slide.height) || 1080}px;--slide-aspect:${(Number(slide.width) || 1920) / (Number(slide.height) || 1080)}" id="${escapeHtml(state.contractVersion === 1 ? `card-${state.deckId}-${slide.id}` : slide.id)}" data-index="${index}" role="button" tabindex="0" aria-label="Open slide ${escapeHtml(displayNumber(slide))}">
                 <div class="stage">
                   ${mediaMarkup(slide)}
                 </div>
@@ -1020,17 +1228,42 @@
           });
         });
 
+        document.querySelectorAll(".stage > img[data-preview-image]").forEach((image) => {
+          const failed = () => {
+            delete image.dataset.retrying;
+            if (image.dataset.failed) return;
+            image.dataset.failed = "true";
+            image.style.display = "none";
+            const error = document.createElement("div");
+            error.className = "html-inline-error";
+            error.dataset.imageError = "true";
+            error.setAttribute("role", "alert");
+            error.textContent = "Failed to load image preview.";
+            image.parentElement.append(error);
+          };
+          image.addEventListener("error", failed);
+          image.addEventListener("load", () => {
+            delete image.dataset.failed;
+            delete image.dataset.retrying;
+            image.style.display = "";
+            image.parentElement.querySelector('[data-image-error="true"]')?.remove();
+          });
+          if (image.complete && !image.naturalWidth) failed();
+        });
+
         renderActiveState();
         scheduleHtmlFrameScale();
       }
 
       function deckSignature(deck) {
+        if (state.contractVersion === 1) return JSON.stringify(deck);
         return [
           deck.id,
           deck.label,
           deck.width, deck.height,
+          JSON.stringify(deck.build || {}),
           ...(deck.slides || []).map((slide) =>
-            `${slide.width}:${slide.height}:${slide.id}:${slide.file}:${slide.version}:${slide.htmlFile || ""}:${slide.htmlVersion || ""}`
+            `${slide.width}:${slide.height}:${slide.id}:${slide.file}:${slide.version}:${slide.htmlFile || ""}:${slide.htmlVersion || ""}:${slide.htmlError || ""}:${slide.imageError || ""}`
           ),
         ].join("|");
       }
@@ -1043,13 +1276,23 @@
         const label = state.decks.find((deck) => deck.id === state.deckId)?.label || "Выбрать презентацию";
         deckTitleNode.textContent = label;
         deckSelect.title = label;
+        syncDownloads();
       }
 
       function updateDeckStatus() {
-        statusNode.textContent = state.generatedAt ? `Обновлено ${formatTime(state.generatedAt)}` : "";
+        const build = state.decks.find(deck => deck.id === state.deckId)?.build;
+        const attempt = build?.latestAttempt;
+        const previous = build?.buildId ? ' · показана опубликованная сборка' : '';
+        statusNode.textContent = build?.state === 'unreadable' ? 'Не удалось прочитать состояние сборки'
+          : attempt?.state === 'failed' ? `Сборка завершилась с ошибкой${previous}`
+          : attempt?.state === 'cancelled' ? `Сборка отменена${previous}`
+          : attempt?.state === 'building' ? `Сборка выполняется${previous}`
+          : attempt?.diagnostics?.length ? 'Сборка с замечаниями'
+          : state.generatedAt ? `Обновлено ${formatTime(state.generatedAt)}` : '';
       }
 
       function activateDeck(deckId, options = {}) {
+        closeDownloadMenu();
         const deck = state.decks.find((item) => item.id === deckId) || state.decks[0];
         if (!deck) {
           state.deckId = "";
@@ -1073,7 +1316,7 @@
         localStorage.setItem(`${storagePrefix}Deck`, state.deckId);
         renderDeckOptions();
 
-        const preferredId = options.preferredSlideId || previousActiveId;
+        const preferredId = options.preferredSlideId || previousActiveId || (state.contractVersion === 1 ? localStorage.getItem(`${storagePrefix}Slide:${state.deckId}`) : "");
         const preferredIndex = state.slides.findIndex((slide) => slide.id === preferredId);
         const legacyIndex = state.deckId === config.legacyDeckId ? localStorage.getItem(`${storagePrefix}Index`) : null;
         const storedIndex = Number(
@@ -1081,7 +1324,7 @@
         );
         state.index = preferredIndex >= 0
           ? preferredIndex
-          : Math.min(storedIndex, Math.max(state.slides.length - 1, 0));
+          : Math.max(0, Math.min(Number.isFinite(storedIndex) ? storedIndex : 0, Math.max(state.slides.length - 1, 0)));
 
         app.classList.toggle("many-slides", state.slides.length >= 24);
         renderSlides();
@@ -1102,6 +1345,9 @@
           }
 
           const payload = await response.json();
+          if (payload.contractVersion !== undefined && payload.contractVersion !== 1) throw new Error("Unsupported read contract version");
+          state.contractVersion = payload.contractVersion === 1 ? 1 : 0;
+          state.project = state.contractVersion === 1 ? payload.project : null;
           const decks = payload.decks || [];
           const signature = decks.map(deckSignature).join("||");
 
@@ -1110,19 +1356,19 @@
 
           if (signature !== state.decksSignature) {
             const activeId = state.slides[state.index]?.id || "";
-            const hashId = location.hash.slice(1);
+            const target = hashTarget(decks);
             state.decks = decks;
             state.decksSignature = signature;
 
-            const hashDeck = decks.find((deck) => (deck.slides || []).some((slide) => slide.id === hashId));
             const savedDeck = decks.find((deck) => deck.id === state.deckId);
-            const targetDeck = hashDeck || savedDeck || decks[0];
-            const preferredSlideId = hashDeck ? hashId : activeId;
+            const targetDeck = target?.deck || savedDeck || decks[0];
+            const preferredSlideId = target ? target.slideId : activeId;
 
             activateDeck(targetDeck?.id, { preferredSlideId });
           } else {
             updateDeckStatus();
           }
+          retryPreviewFailures();
         } catch (error) {
           app.classList.remove("is-loading");
           statusNode.textContent = `Сервер недоступен: ${error.message}`;
@@ -1166,6 +1412,7 @@
       document.addEventListener("keydown", (event) => {
         if (event.altKey || event.ctrlKey || event.metaKey || event.defaultPrevented) return;
         if (event.target.closest("input, select, textarea, [contenteditable]")) return;
+        if(event.target.closest('.download-control'))return;
         if (event.key === " " && event.target.closest("button, a")) return;
 
         if (event.key === "ArrowLeft" || event.key === "PageUp") {
@@ -1182,15 +1429,13 @@
       });
 
       window.addEventListener("hashchange", () => {
-        const hash = location.hash.slice(1);
-        const targetDeck = state.decks.find((deck) =>
-          (deck.slides || []).some((slide) => slide.id === hash)
-        );
-        if (targetDeck && targetDeck.id !== state.deckId) {
-          activateDeck(targetDeck.id, { preferredSlideId: hash });
+        const target = hashTarget(state.decks);
+        if (!target) return;
+        if (target.deck.id !== state.deckId) {
+          activateDeck(target.deck.id, { preferredSlideId: target.slideId });
           return;
         }
-        const index = state.slides.findIndex((slide) => slide.id === hash);
+        const index = state.slides.findIndex((slide) => slide.id === target.slideId);
         if (index >= 0) setIndex(index);
       });
 

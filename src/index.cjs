@@ -1,4 +1,9 @@
 const { createReviewServer, startReviewServer } = require('./server.cjs');
 const { createRenderer } = require('./renderer.cjs');
 const { scanSlides, scanDecks } = require('./artifacts.cjs');
-module.exports = { createReviewServer, startReviewServer, createRenderer, scanSlides, scanDecks };
+const presentation = require('./document.cjs');
+const templates = require('./templates.cjs');
+const compositions = require('./compositions.cjs');
+const editing = require('./editing.cjs');
+const storage = require('./storage.cjs');
+module.exports = { createReviewServer, startReviewServer, createRenderer, scanSlides, scanDecks, presentation, templates, compositions, editing, storage };

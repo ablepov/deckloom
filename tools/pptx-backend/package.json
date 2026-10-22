@@ -1,0 +1,12 @@
+{
+  "name": "deckloom-pptx-backend-build",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "esbuild": "0.28.2",
+    "jszip": "3.10.1",
+    "pptxgenjs": "4.0.1"
+  },
+  "overrides": { "image-size": "2.0.4" }
+}

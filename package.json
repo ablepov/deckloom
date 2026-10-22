@@ -1,13 +1,28 @@
 {
   "name": "deckloom",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A local HTML presentation viewer, renderer and layout diagnostics engine",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/ablepov/deckloom.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ablepov/deckloom.git"
+  },
   "homepage": "https://github.com/ablepov/deckloom#readme",
-  "bugs": { "url": "https://github.com/ablepov/deckloom/issues" },
-  "keywords": ["presentation", "slides", "html", "viewer", "renderer", "playwright"],
-  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
+  "bugs": {
+    "url": "https://github.com/ablepov/deckloom/issues"
+  },
+  "keywords": [
+    "presentation",
+    "slides",
+    "html",
+    "viewer",
+    "renderer",
+    "playwright"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "commonjs",
   "main": "src/index.cjs",
   "exports": {
@@ -15,15 +30,46 @@
     "./node": "./src/index.cjs",
     "./qa": "./src/qa.cjs"
   },
-  "bin": { "deckloom": "bin/deckloom.cjs" },
-  "files": ["src", "bin", "viewer", "examples", "scripts", "test", "README.md", "LICENSE"],
+  "bin": {
+    "deckloom": "bin/deckloom.cjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "viewer",
+    "examples",
+    "scripts",
+    "test",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "check": "node scripts/check.cjs",
-    "test": "node --test test/*.test.cjs",
+    "test": "node --test --test-concurrency=2 test/*.test.cjs",
+    "check:baseline": "node scripts/check-baseline.cjs",
+    "check:baseline:ci": "node scripts/check-baseline.cjs --large=24",
+    "check:package": "node scripts/check-package.cjs",
+    "check:package:published": "node scripts/check-package.cjs --published=0.2.0",
+    "check:export": "node scripts/check-export.cjs",
+    "check:pptx": "node scripts/check-pptx.cjs",
+    "check:engine": "node scripts/check-engine.cjs",
+    "check:pptx-backend": "node tools/pptx-backend/check.cjs",
     "dev": "node bin/deckloom.cjs dev --config=examples/deckloom.config.cjs",
     "render:example": "node bin/deckloom.cjs render --config=examples/deckloom.config.cjs --deck=all"
   },
-  "peerDependencies": { "playwright": ">=1.57.0 <2" },
-  "devDependencies": { "playwright": "1.59.1" },
-  "engines": { "node": ">=22" }
+  "peerDependencies": {
+    "playwright": ">=1.57.0 <2"
+  },
+  "devDependencies": {
+    "playwright": "1.59.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "parse5": "8.0.1",
+    "pdf-lib": "1.17.1",
+    "postcss": "8.5.31",
+    "postcss-value-parser": "4.2.0"
+  }
 }

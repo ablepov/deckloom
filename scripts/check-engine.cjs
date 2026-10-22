@@ -1,0 +1,30 @@
+const fs = require('node:fs/promises'), path = require('node:path'), assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
+const { presentation, templates, compositions, editing, storage, createRenderer } = require('../src/index.cjs');
+async function main() {
+  const folder = path.resolve(process.argv.find(a => a.startsWith('--output='))?.slice(9) || 'output/validation/engine/latest'); await fs.mkdir(folder, { recursive: true });
+  const library = require('../examples/engine-library.cjs'), authored = require('../examples/engine-authoring.cjs');
+  const catalog = templates.createCatalog([library]), editor = editing.createEditor(catalog), ref = { libraryId: library.id, templateId: 'summary', revision: '1' };
+  let doc = editor.create({ projectId: 'engine-check', id: 'main', width: 960, height: 540 });
+  doc = editor.addTemplate(doc, ref, 'first'); doc = editor.addTemplate(doc, ref, 'second');
+  doc = editor.editFields(doc, 'first', { title: 'Первый экземпляр — изменён' }); assert.equal(doc.slides[1].content.data.title, library.templates[0].defaults.title);
+  doc = editor.setTheme(doc, 'second', 'dark'); doc = editor.rename(doc, 'second', 'Второй экземпляр');
+  doc = editor.addAuthored(doc, 'authored', authored.definition, authored.values);
+  const rows = structuredClone(authored.values.rows); rows[1][2] = '140'; doc = editor.editFields(doc, 'authored', { rows }); assert.equal(authored.values.rows[1][2], '135');
+  assert.deepEqual(presentation.deserialize(presentation.serialize(doc)), doc);
+  const storeRoot = path.join(folder, 'store-' + randomUUID()), store = storage.createStore({ root: storeRoot, catalog });
+  let receipt = await store.save(doc, { expectedToken: null }); receipt = await store.rename(doc.projectId, doc.id, 'Сквозная проверка «движка»', { expectedToken: receipt.token });
+  const draft = editor.editFields(receipt.document, 'first', { body: 'Автосохранение восстановлено.' }); await store.autosave(draft, { expectedToken: receipt.token });
+  receipt = await store.recover(doc.projectId, doc.id, { source: 'autosave', expectedToken: receipt.token });
+  const reopened = await storage.createStore({ root: storeRoot, catalog }).load(doc.projectId, doc.id); assert.deepEqual(reopened, { document: draft, token: receipt.token });
+  await assert.rejects(store.save(doc, { expectedToken: null }), { code: 'STORAGE_CONFLICT' });
+  assert.throws(() => editor.editFields(draft, 'authored', { rows: [['bad columns']] }), { code: 'INVALID_INSTANCE_DATA' });
+  const changedLibrary = structuredClone(library); changedLibrary.templates[0].definition.blocks[0].x++;
+  assert.throws(() => compositions.validateDocument(draft, templates.createCatalog([changedLibrary])), { code: 'TEMPLATE_INTEGRITY_MISMATCH' });
+  await fs.writeFile(path.join(folder, 'presentation.json'), presentation.serialize(draft), 'utf8'); await fs.writeFile(path.join(folder, 'library.json'), JSON.stringify(library, null, 2), 'utf8');
+  const result = await createRenderer(compositions.createProject(reopened.document, catalog, { root: path.resolve(__dirname, '../examples') })).export({ deckId: doc.id, outputRoot: path.join(folder, 'export-' + randomUUID()), formats: ['html', 'png', 'pdf', ...(process.platform === 'win32' ? ['pptx'] : [])], fonts: { policy: 'allow-substitution' }, ...(process.platform === 'win32' ? { pptx: { mode: 'strict', fonts: { mode: 'reference', family: 'Arial', profile: 'windows-installed-v1' } } } : {}) });
+  await fs.writeFile(path.join(folder, 'result.json'), JSON.stringify(result, null, 2), 'utf8'); assert.equal(result.status, 'succeeded', JSON.stringify(result.error || result.diagnostics));
+  const verification = { status: 'passed', sequence: ['create', 'instantiate-twice', 'independent-edits', 'theme', 'authored-table-connector-crop-opacity', 'serialize', 'save', 'rename', 'autosave', 'recover', 'new-store-reopen', 'export'], negativeChecks: ['conflict', 'invalid-table-edit', 'library-drift'], storeRoot, result: path.join(folder, 'result.json') };
+  await fs.writeFile(path.join(folder, 'verification.json'), JSON.stringify(verification, null, 2), 'utf8'); console.log(JSON.stringify(verification));
+}
+main().catch(e => { console.error(e); process.exitCode = 1; });
