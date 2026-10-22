@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+# Generated notices preserve the exact line endings of upstream license texts.
+src/vendor/pptx/THIRD_PARTY_NOTICES.txt -text

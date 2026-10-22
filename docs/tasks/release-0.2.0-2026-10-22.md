@@ -20,3 +20,7 @@ Evidence directory: `output/validation/release-0.2.0/`. Local personal instructi
 - `npm pack --dry-run`: 85 entries, only intended public package roots. Source font licenses and backend notices retained; consumer fonts/assets excluded.
 
 `git diff --cached --check` reports pre-existing trailing blank lines and one space in the verbatim third-party DejaVu license. These are formatting observations, not runtime failures; the license text was preserved.
+
+## Cross-platform release gate
+
+The first Actions attempt stopped before publication: Git normalized mixed line endings in the generated upstream notices, so Linux reproducibility correctly rejected them. Added explicit LF rules for repository text and binary treatment for the generated notices to preserve upstream license bytes. Runtime code and the backend bundle are unchanged. Subsequent Actions results are recorded below.
