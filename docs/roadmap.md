@@ -1,5 +1,7 @@
 # План развития Deckloom
 
+**22.10.2026 — patch0.2.1 опубликован и установлен в Monq:** Lucide toolbar SVG, видимый loader/«Готовим…» и исправленный z-index меню. CI Linux/Windows, registry archive, browser desktop/mobile/reduced-motion/error/success и PDF16 страниц на обычном3000 прошли. Этапы движка/экспорта и ограничения форматов не менялись. [Запись релиза и evidence](tasks/toolbar-icons-2026-10-22.md).
+
 **22.10.2026 — релиз0.2.0 выполнен:** пакет опубликован в npm и установлен точной зависимостью в Monq Slides. Полный CI Linux/Windows, registry archive, Retail16 render, viewer19 и PDF/PPTX/ZIP через обычный3000 прошли;4070 остановлен. [Запись релиза и ограничения](tasks/release-0.2.0-2026-10-22.md). Предыдущие сведения installed0.1.0/preview4070 ниже исторические.
 
 Для продолжения в новом чате: [текущее состояние, записи этапов и следующий шаг](current-state.md). История чатов не является необходимым источником состояния проекта.
