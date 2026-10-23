@@ -129,6 +129,7 @@
     announce('Точка выбрана на исходном PNG. Напишите комментарий.'); renderControls(); pins();
   }
   function renderControls() {
+    find('[data-action=import]').hidden = loaded?.importable === false;
     find('[data-action=place]').disabled = !loaded?.writable || busy || Boolean(pending);
     find('[data-action=import]').disabled = !loaded?.writable || busy || Boolean(pending);
     find('[data-action=place]').setAttribute('aria-pressed', String(placing));

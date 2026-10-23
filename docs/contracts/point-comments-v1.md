@@ -62,7 +62,7 @@ Project.comments: `{sourceId,projectId,root,author,slideIds?,maxImageBytes?}`. �
 
 Локальные endpoints: GET `/api/comments?deck=…`, `/context`, `/image`, `/export`; POST `/api/comments` для операции и `/import` для JSON/ZIP. POST требует серверный `X-Deckloom-Comment-Token`; импорт также ожидаемый storage token. Это защита локальных записей от cross-site запроса, не Site account authentication. Обычный dev binding — loopback. Site обязан использовать свои сессии/API, не открывать локальный adapter как сервер совместной работы.
 
-Read view-model: `{document,token,author,canModerate,writable,bindings,availableImages}`, binding=`{viewerSlideId,slideId}`. `/context` возвращает `{context,imageUrl}`. Provider сайта должен адаптировать эту проекцию и статусы, а не копировать UI.
+Read view-model: `{document,token,author,canModerate,writable,bindings,availableImages}`, binding=`{viewerSlideId,slideId}`. Необязательное `importable:false` скрывает кнопку импорта для hosts, где разрешён только экспорт; отсутствие поля сохраняет прежнее поведение. Это UI capability, сервер самостоятельно проверяет доступ к импорту. `/context` возвращает `{context,imageUrl}`. Provider сайта должен адаптировать эту проекцию и статусы, а не копировать UI.
 
 `viewer.renderPage({title,favicon?,config})` даёт один общий HTML. `viewer.asset('comments.js'|'comments.css')` — его дополнительные assets. `config.apiBase` и `commentsBase` позволяют host подключить защищённые routes. S3-специфика и права остаются снаружи.
 
