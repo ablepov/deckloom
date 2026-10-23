@@ -23,6 +23,11 @@ function fixture() {
   return { document, image, sha, images: new Map([[sha, image]]) };
 }
 const error = code => e => { assert.equal(e.code, code, e.stack); return true; };
+async function removeFixture(root) {
+  assert.equal(path.dirname(root), os.tmpdir());
+  // Windows can briefly retain a removed directory entry after the last close.
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 5 });
+}
 
 test('portable ZIP carries only declared PNG and JSON, survives offline round trip and recompression', async () => {
   const f = fixture(), bytes = await comments.exportBundle(f.document, async sha => f.images.get(sha));
@@ -54,7 +59,7 @@ test('ZIP rejects changed images, missing context, traversal, CRC and dimensions
 });
 
 test('file CAS survives a new store instance; conflicting writes cannot lose a concurrent reply', async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'deckloom-comments-')); t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'deckloom-comments-')); t.after(() => removeFixture(root));
   const a = comments.createStore({ root }), b = comments.createStore({ root }), f = fixture();
   const first = await a.compareAndSwap(scope, f.document, null, f.images);
   assert.deepEqual((await b.load(scope)).document, f.document);
@@ -68,7 +73,7 @@ test('file CAS survives a new store instance; conflicting writes cannot lose a c
 });
 
 test('closing removes stored text and unreferenced image; another scope still pins the same PNG', async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'deckloom-comments-')); t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'deckloom-comments-')); t.after(() => removeFixture(root));
   const store = comments.createStore({ root }), f = fixture(), secondScope = { ...scope, deckId: 'another' };
   const saved = await store.compareAndSwap(scope, f.document, null, f.images);
   const second = { ...f.document, ...secondScope }; const other = await store.compareAndSwap(secondScope, second, null, f.images);
@@ -81,7 +86,7 @@ test('closing removes stored text and unreferenced image; another scope still pi
 });
 
 test('quota failure leaves no partial document/image; unsafe scope is rejected', async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'deckloom-comments-')); t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'deckloom-comments-')); t.after(() => removeFixture(root));
   const f = fixture(), store = comments.createStore({ root, maxImageBytes: 1 });
   await assert.rejects(store.compareAndSwap(scope, f.document, null, f.images), error('COMMENTS_STORAGE_QUOTA'));
   assert.equal(await store.load(scope), null); assert.equal(await store.readImage(f.sha), null);

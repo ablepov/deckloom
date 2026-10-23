@@ -567,19 +567,28 @@
       const config = window.deckloomConfig || {};
       const apiUrl = suffix => `${config.apiBase || '/api'}${suffix}`;
       const storagePrefix = config.storagePrefix || "deckloom";
+      // Embedded browsers may deny storage. Viewing and presenting still work in memory.
+      const storage = {
+        getItem(key) { try { return localStorage.getItem(key); } catch { return null; } },
+        setItem(key, value) { try { localStorage.setItem(key, value); } catch { /* Optional view persistence. */ } },
+      };
       const state = {
         decks: [],
-        deckId: localStorage.getItem(`${storagePrefix}Deck`) || "",
+        deckId: storage.getItem(`${storagePrefix}Deck`) || "",
         slides: [],
         index: 0,
-        mode: localStorage.getItem(`${storagePrefix}Mode`) || "focus",
+        mode: storage.getItem(`${storagePrefix}Mode`) || "focus",
         signature: "",
         decksSignature: null,
         contractVersion: 0,
         project: null,
         generatedAt: "",
         requestInFlight: false,
+        presenting: false,
+        updatesHeld: false,
+        readEpoch: 0,
       };
+      let readAbort;
 
       const dockState = { hovered: false, frame: 0, pointerX: 0 };
       const wheelState = { lastEvent: 0, direction: 0, distance: 0, consumed: false };
@@ -1139,7 +1148,7 @@
         wheelState.consumed = false;
         wheelState.distance = 0;
         wheelState.lastEvent = 0;
-        localStorage.setItem(`${storagePrefix}Mode`, mode);
+        storage.setItem(`${storagePrefix}Mode`, mode);
         app.classList.toggle("focus-mode", mode === "focus");
         app.classList.toggle("deck-mode", mode === "deck");
         focusButton.setAttribute("aria-pressed", String(mode === "focus"));
@@ -1155,8 +1164,8 @@
 
         const slideCount = state.slides.length;
         state.index = (index + slideCount) % slideCount;
-        localStorage.setItem(`${storagePrefix}Index:${state.deckId}`, String(state.index));
-        if (state.contractVersion === 1) localStorage.setItem(`${storagePrefix}Slide:${state.deckId}`, state.slides[state.index].id);
+        storage.setItem(`${storagePrefix}Index:${state.deckId}`, String(state.index));
+        if (state.contractVersion === 1) storage.setItem(`${storagePrefix}Slide:${state.deckId}`, state.slides[state.index].id);
         renderActiveState();
       }
 
@@ -1280,8 +1289,8 @@
         scheduleHtmlFrameScale();
       }
 
-      function deckSignature(deck) {
-        if (state.contractVersion === 1) return JSON.stringify(deck);
+      function deckSignature(deck, contractVersion = state.contractVersion) {
+        if (contractVersion === 1) return JSON.stringify(deck);
         return [
           deck.id,
           deck.label,
@@ -1338,14 +1347,14 @@
         wheelState.distance = 0;
         state.slides = deck.slides || [];
         state.signature = deckSignature(deck);
-        localStorage.setItem(`${storagePrefix}Deck`, state.deckId);
+        storage.setItem(`${storagePrefix}Deck`, state.deckId);
         renderDeckOptions();
 
-        const preferredId = options.preferredSlideId || previousActiveId || (state.contractVersion === 1 ? localStorage.getItem(`${storagePrefix}Slide:${state.deckId}`) : "");
+        const preferredId = options.preferredSlideId || previousActiveId || (state.contractVersion === 1 ? storage.getItem(`${storagePrefix}Slide:${state.deckId}`) : "");
         const preferredIndex = state.slides.findIndex((slide) => slide.id === preferredId);
-        const legacyIndex = state.deckId === config.legacyDeckId ? localStorage.getItem(`${storagePrefix}Index`) : null;
+        const legacyIndex = state.deckId === config.legacyDeckId ? storage.getItem(`${storagePrefix}Index`) : null;
         const storedIndex = Number(
-          localStorage.getItem(`${storagePrefix}Index:${state.deckId}`) || legacyIndex || 0
+          storage.getItem(`${storagePrefix}Index:${state.deckId}`) || legacyIndex || 0
         );
         state.index = preferredIndex >= 0
           ? preferredIndex
@@ -1356,13 +1365,16 @@
         updateDeckStatus();
       }
 
-      async function loadSlides() {
-        if (state.requestInFlight) return;
+      async function loadSlides(options = {}) {
+        if (state.presenting || state.requestInFlight || state.updatesHeld && !options.review && !options.apply) return;
         state.requestInFlight = true;
+        const epoch = state.readEpoch;
+        readAbort = new AbortController();
 
         try {
           const response = await fetch(apiUrl(`/decks?ts=${Date.now()}`), {
             cache: "no-store",
+            signal: AbortSignal.any([readAbort.signal, AbortSignal.timeout(30000)]),
           });
 
           if (!response.ok) {
@@ -1370,11 +1382,18 @@
           }
 
           const payload = await response.json();
+          if (epoch !== state.readEpoch) return;
           if (payload.contractVersion !== undefined && payload.contractVersion !== 1) throw new Error("Unsupported read contract version");
+          const signature = (payload.decks || []).map(deck => deckSignature(deck, payload.contractVersion === 1 ? 1 : 0)).join("||");
+          if (state.updatesHeld && !options.apply && signature !== state.decksSignature) {
+            window.dispatchEvent(new CustomEvent('deckloom:updates', { detail: { available: true } }));
+            return;
+          }
+          state.updatesHeld = false;
+          window.dispatchEvent(new CustomEvent('deckloom:updates', { detail: { available: false } }));
           state.contractVersion = payload.contractVersion === 1 ? 1 : 0;
           state.project = state.contractVersion === 1 ? payload.project : null;
           const decks = payload.decks || [];
-          const signature = decks.map(deckSignature).join("||");
 
           app.classList.remove("is-loading");
           state.generatedAt = payload.generatedAt;
@@ -1395,10 +1414,24 @@
           }
           retryPreviewFailures();
         } catch (error) {
+          if (epoch !== state.readEpoch) return;
           app.classList.remove("is-loading");
           statusNode.textContent = `Сервер недоступен: ${error.message}`;
+          if (state.updatesHeld) window.dispatchEvent(new CustomEvent('deckloom:updates', { detail: { error: true } }));
         } finally {
-          state.requestInFlight = false;
+          if (epoch === state.readEpoch) state.requestInFlight = false;
+        }
+      }
+
+      function holdPresentation(active) {
+        state.presenting = active;
+        state.updatesHeld = true;
+        state.readEpoch++;
+        readAbort?.abort();
+        state.requestInFlight = false;
+        if (!active) {
+          if (config.published) state.updatesHeld = false;
+          else loadSlides({ review: true });
         }
       }
 
@@ -1412,6 +1445,7 @@
       });
 
       app.addEventListener("wheel", (event) => {
+        if (state.presenting) return;
         if (state.mode !== "focus" || state.slides.length < 2) return;
         if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
         if (event.target.closest(".topbar, .slide-dock, input, select, textarea, button, a, [contenteditable], [role='slider']")) return;
@@ -1435,7 +1469,8 @@
       }, { passive: false });
 
       document.addEventListener("keydown", (event) => {
-        if (event.altKey || event.ctrlKey || event.metaKey || event.defaultPrevented) return;
+        if (state.presenting) return;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
         if (event.target.closest("input, select, textarea, [contenteditable]")) return;
         if(event.target.closest('.download-control'))return;
         if (event.key === " " && event.target.closest("button, a")) return;
@@ -1454,6 +1489,7 @@
       });
 
       window.addEventListener("hashchange", () => {
+        if (state.presenting || state.updatesHeld) return;
         const target = hashTarget(state.decks);
         if (!target) return;
         if (target.deck.id !== state.deckId) {
@@ -1464,11 +1500,13 @@
         if (index >= 0) setIndex(index);
       });
 
-      window.deckloomViewer = { state, openSlide, setMode, setIndex };
+      window.deckloomViewer = { state, openSlide, setMode, setIndex, holdPresentation,
+        refresh: () => loadSlides({ apply: true }), checkUpdates: () => loadSlides({ review: true }), sourceForSlide, loadDocumentFrame };
       setMode(state.mode === "deck" ? "deck" : "focus");
       loadSlides();
-      if(!config.published)setInterval(loadSlides, 1000);
+      if(!config.published)setInterval(() => loadSlides(), 1000);
     </script>
+    __DECKLOOM_PRESENTATION__
     __DECKLOOM_COMMENTS__
   </body>
 </html>

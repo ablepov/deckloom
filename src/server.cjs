@@ -23,6 +23,7 @@ function createReviewServer(project) {
   const commentToken = randomUUID();
   const viewer = project.viewer || {};
   const config = { storagePrefix: viewer.storagePrefix || 'deckloom', ...(viewer.legacyDeckId ? { legacyDeckId: viewer.legacyDeckId } : {}), downloadToken, comments: Boolean(comments), commentToken };
+  if (viewer.presentation !== undefined) config.presentation = viewer.presentation;
   const html = sharedViewer.renderPage({ title: viewer.title || 'Deckloom', favicon: viewer.favicon, config });
   const send = (req, res, status, body, type = 'application/json; charset=utf-8') => {
     const buffer = Buffer.from(typeof body === 'string' ? body : JSON.stringify(body, null, 2));

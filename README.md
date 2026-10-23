@@ -57,7 +57,9 @@ For isolated output, `baseUrl` points at the corresponding original artifact dir
 
 Optional project hooks: `validateDocument(html, deck, slide)`, `renderSpec(deck, slide)`, `renderQa(context)`, `reportName(deck)`, `measureLayout` and `issueCount`. `renderDeck(browser, deck, {outputRoot})` is available for consumers that manage their own Playwright browser. Runtime page errors and missing images fail CLI rendering through the report.
 
-`viewer` config supports `title`, `favicon`, `storagePrefix`, and optional `legacyDeckId` for migrating older saved state. `staticMounts` maps explicit URL prefixes or exact files to filesystem resources. The server serves these mounts and registered artifact directories; it does not expose the entire project checkout. It listens on localhost by default.
+`viewer` config supports `title`, `favicon`, `storagePrefix`, and optional `legacyDeckId` for migrating older saved state. The manual presentation mode starts at the selected slide, prepares a fixed snapshot, requests fullscreen with a window fallback, and uses arrows/PageUp/PageDown/Space without wrapping. Escape returns to the previous view. Set `viewer.presentation: false` (or `config.presentation: false` for `viewer.renderPage`) to disable it. This source candidate is not yet released; see the [presentation contract](docs/contracts/presentation-mode-v1.md).
+
+`staticMounts` maps explicit URL prefixes or exact files to filesystem resources. The server serves these mounts and registered artifact directories; it does not expose the entire project checkout. It listens on localhost by default.
 
 ```js
 const { createLayoutMeasure, issueCount } = require('deckloom/qa');

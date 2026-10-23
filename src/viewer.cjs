@@ -15,6 +15,8 @@ function renderPage({ title = 'Deckloom', favicon, config = {} } = {}) {
     .replace('__DECKLOOM_FAVICON__', favicon ? `<link rel="icon" href="${escape(favicon)}" />` : '')
     .replace('__DECKLOOM_CONFIG__', () => JSON.stringify(config).replace(/</g, '\\u003c'))
     .replace('__DECKLOOM_PROFILE__', () => staticInspection.toString())
+    .replace('__DECKLOOM_PRESENTATION__', () => config.presentation === false ? '' :
+      `<style>${fs.readFileSync(path.join(__dirname, '../viewer/presentation.css'), 'utf8')}</style><script>${fs.readFileSync(path.join(__dirname, '../viewer/presentation.js'), 'utf8')}</script>`)
     .replace('__DECKLOOM_COMMENTS__', () => config.comments ? `<link rel="stylesheet" href="${base}/ui.css"><script src="${base}/ui.js"></script>` : '');
 }
 function asset(name) {

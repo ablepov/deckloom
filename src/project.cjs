@@ -94,9 +94,13 @@ function normalizeProject(input, { cwd = process.cwd() } = {}) {
   const viewer = {};
   if (owns(input, 'viewer')) {
     if (legacy) record(input.viewer, 'project.viewer');
-    else closed(input.viewer, ['title', 'favicon', 'storagePrefix', 'legacyDeckId'], 'project.viewer');
+    else closed(input.viewer, ['title', 'favicon', 'storagePrefix', 'legacyDeckId', 'presentation'], 'project.viewer');
     for (const key of ['title', 'favicon', 'storagePrefix', 'legacyDeckId']) {
       if (owns(input.viewer, key)) viewer[key] = text(input.viewer[key], `project.viewer.${key}`);
+    }
+    if (owns(input.viewer, 'presentation')) {
+      if (typeof input.viewer.presentation !== 'boolean') fail('INVALID_TYPE', 'project.viewer.presentation', 'Expected a boolean');
+      viewer.presentation = input.viewer.presentation;
     }
   }
   viewer.storagePrefix ??= legacy ? 'deckloom' : `deckloom:${id}`;
