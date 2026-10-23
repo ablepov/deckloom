@@ -116,7 +116,7 @@ async function main() {
         assert.equal((await fetch(readOrigin + '/artifacts/assets/marker.svg')).status, 200);
         assert.deepEqual(errors, []);
         v1Read = true;
-      } finally { await new Promise(resolve => readServer.close(resolve)); }
+      } finally { await new Promise(resolve => { readServer.close(resolve); readServer.closeAllConnections(); }); }
       const archive = { ...readProject, mode: 'discovery', decks: readProject.decks.map(({ slides, ...deck }) => deck) };
       const archiveResult = await engine.scanDecks(archive);
       assert.deepEqual(archiveResult.decks[0].slides.map(slide => slide.id), ['wide-01', 'wide-02']);
@@ -151,7 +151,7 @@ async function main() {
         assert.deepEqual(await page.locator('.html-inline-holder').evaluateAll(nodes => nodes.map(node => [node.offsetWidth, node.offsetHeight])), [[800, 450], [600, 450], [800, 700], [450, 800]]);
         assert.deepEqual(errors, []);
         v1Render = true;
-      } finally { await new Promise(resolve => runtimeServer.close(resolve)); }
+      } finally { await new Promise(resolve => { runtimeServer.close(resolve); runtimeServer.closeAllConnections(); }); }
       const exportFile = path.join(__dirname, 'export.config.cjs');
       await fs.writeFile(exportFile, `const path = require('node:path');\nconst fixture = require(${JSON.stringify(path.join(installRoot, 'examples/export.config.cjs'))});\nmodule.exports = { ...fixture, root: path.join(__dirname, 'export-source') };\n`, 'utf8');
       const portable = await engine.createRenderer(require(exportFile)).export({ deckId: 'demo', outputRoot: path.join(__dirname, 'portable'), browser,
@@ -173,7 +173,7 @@ async function main() {
     console.log(JSON.stringify({ status: 'passed', imports: 3, decks: 2, slides: 3, apiRenderSlides: reports.length, viewer: true, localSvg: true, cyrillic: true, spec: true, qa: true, ...(v1Read ? { v1Read, discovery, v1Render, v1Export, f1Document, f2g1Engine, pointComments } : {}) }));
   } finally {
     if (browser) await browser.close();
-    if (server) await new Promise(resolve => server.close(resolve));
+    if (server) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
   }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

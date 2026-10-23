@@ -45,7 +45,11 @@ async function stableFixture(t) {
 async function serve(t, input) {
   const server = createReviewServer(input);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  t.after(() => new Promise(resolve => server.close(resolve)));
+  t.after(() => new Promise(resolve => {
+    server.close(resolve);
+    // Browser cleanup is registered later; its polling must not hold this hook open.
+    server.closeAllConnections();
+  }));
   return `http://127.0.0.1:${server.address().port}`;
 }
 
