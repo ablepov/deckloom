@@ -3,28 +3,27 @@ const fsp = require('node:fs/promises');
 const http = require('node:http');
 const path = require('node:path');
 const { createArtifactReader } = require('./artifacts.cjs');
-const { staticInspection } = require('./runtime.cjs');
 const { randomUUID } = require('node:crypto');
 const { createDownloadService } = require('./downloads.cjs');
+const { createLocalService } = require('./comments-local.cjs');
+const commentsContract = require('./comments.cjs');
+const sharedViewer = require('./viewer.cjs');
 
 const noStore = { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate', Pragma: 'no-cache', Expires: '0', 'Surrogate-Control': 'no-store' };
 // Deck outputs are served only through declared generation paths.
 const exportMime = { '.pdf': 'application/pdf', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf', '.ico': 'image/x-icon' };
-const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const within = (root, file) => file === root || file.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
 
 function createReviewServer(project) {
   const downloads = createDownloadService(project), downloadToken = randomUUID();
   const reader = createArtifactReader(project);
   project = reader.project;
+  const comments = project.comments ? createLocalService(reader, project.comments) : null;
+  const commentToken = randomUUID();
   const viewer = project.viewer || {};
-  const config = JSON.stringify({ storagePrefix: viewer.storagePrefix || 'deckloom', legacyDeckId: viewer.legacyDeckId, downloadToken }).replace(/</g, '\\u003c');
-  const html = fs.readFileSync(path.join(__dirname, '../viewer/index.html'), 'utf8')
-    .replace('__DECKLOOM_TITLE__', escapeHtml(viewer.title || 'Deckloom'))
-    .replace('__DECKLOOM_FAVICON__', viewer.favicon ? `<link rel="icon" href="${escapeHtml(viewer.favicon)}" />` : '')
-    .replace('__DECKLOOM_CONFIG__', () => config)
-    .replace('__DECKLOOM_PROFILE__', () => staticInspection.toString());
+  const config = { storagePrefix: viewer.storagePrefix || 'deckloom', ...(viewer.legacyDeckId ? { legacyDeckId: viewer.legacyDeckId } : {}), downloadToken, comments: Boolean(comments), commentToken };
+  const html = sharedViewer.renderPage({ title: viewer.title || 'Deckloom', favicon: viewer.favicon, config });
   const send = (req, res, status, body, type = 'application/json; charset=utf-8') => {
     const buffer = Buffer.from(typeof body === 'string' ? body : JSON.stringify(body, null, 2));
     res.writeHead(status, { ...noStore, 'Content-Type': type, 'Content-Length': buffer.length });
@@ -64,6 +63,57 @@ function createReviewServer(project) {
   const server = http.createServer((req, res) => {
     (async () => {
       const url = new URL(req.url, 'http://localhost');
+      if (url.pathname.startsWith('/api/comments')) {
+        if (!comments) return send(req,res,404,{code:'COMMENTS_DISABLED'});
+        const deckId=url.searchParams.get('deck');
+        try {
+          if (req.method==='GET' || req.method==='HEAD') {
+            if(url.pathname==='/api/comments/ui.js'||url.pathname==='/api/comments/ui.css'){
+              const name=url.pathname.endsWith('.js')?'comments.js':'comments.css';
+              return send(req,res,200,sharedViewer.asset(name),mime[path.extname(name)]);
+            }
+            if(url.pathname==='/api/comments')return send(req,res,200,await comments.load(deckId));
+            if(url.pathname==='/api/comments/context'){
+              const {context,imageUrl}=await comments.current(deckId,url.searchParams.get('slide'));
+              return send(req,res,200,{context,imageUrl});
+            }
+            if(url.pathname==='/api/comments/image'){
+              const bytes=await comments.image(deckId,url.searchParams.get('sha'));
+              if(!bytes)return send(req,res,404,{code:'COMMENTS_IMAGE_MISSING'});
+              res.writeHead(200,{...noStore,'Content-Type':'image/png','Content-Length':bytes.length,'X-Content-Type-Options':'nosniff'});
+              return res.end(req.method==='HEAD'?undefined:bytes);
+            }
+            if(url.pathname==='/api/comments/export'){
+              const format=url.searchParams.get('format')==='zip'?'zip':'json',bytes=await comments.export(deckId,format);
+              res.writeHead(200,{...noStore,'Content-Type':format==='zip'?'application/zip':'application/json; charset=utf-8','Content-Length':bytes.length,'Content-Disposition':`attachment; filename="comments.${format}"`,'X-Content-Type-Options':'nosniff'});
+              return res.end(req.method==='HEAD'?undefined:bytes);
+            }
+            return send(req,res,404,{code:'COMMENTS_NOT_FOUND'});
+          }
+          if(req.method!=='POST')return send(req,res,405,{code:'COMMENTS_METHOD'});
+          if(req.headers['x-deckloom-comment-token']!==commentToken||req.headers['sec-fetch-site']==='cross-site')return send(req,res,403,{code:'COMMENTS_FORBIDDEN'});
+          const importing=url.pathname==='/api/comments/import',zip=importing&&/^application\/zip(?:;|$)/i.test(req.headers['content-type']||'');
+          if(!zip&&!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))return send(req,res,415,{code:'COMMENTS_CONTENT_TYPE'});
+          const maximum=importing?(zip?308:8)*1024*1024:64*1024,chunks=[];let length=0;
+          for await(const chunk of req){length+=chunk.length;if(length<=maximum)chunks.push(chunk);}
+          if(length>maximum)return send(req,res,413,{code:'COMMENTS_BUDGET'});
+          const bytes=Buffer.concat(chunks);
+          if(importing){
+            const imported=zip?commentsContract.importBundle(bytes):{document:commentsContract.parse(bytes),images:new Map()};
+            const expected=req.headers['x-deckloom-expected-token'];
+            if(typeof expected!=='string')return send(req,res,400,{code:'COMMENTS_STORAGE_TOKEN'});
+            const result=await comments.importDocument(deckId,imported.document,imported.images,expected==='null'?null:expected);
+            return send(req,res,result.conflicts?.length?409:200,result);
+          }
+          if(url.pathname!=='/api/comments')return send(req,res,404,{code:'COMMENTS_NOT_FOUND'});
+          let value;try{value=JSON.parse(bytes.toString('utf8'))}catch{return send(req,res,400,{code:'COMMENTS_INVALID_JSON'})}
+          return send(req,res,200,await comments.mutate(deckId,value.operation,value.viewerSlideId));
+        }catch(error){
+          const code=error.code||'COMMENTS_FAILED';
+          const status=code==='COMMENTS_FORBIDDEN'?403:/CONFLICT|CLOSED|MISMATCH|BUSY|QUOTA/.test(code)?409:/NOT_FOUND|UNKNOWN_DECK|IMAGE_MISSING/.test(code)?404:400;
+          return send(req,res,status,{code});
+        }
+      }
       if(url.pathname==='/api/downloads'&&req.method==='POST'){
         const origin=req.headers.origin;
         if(req.headers['x-deckloom-token']!==downloadToken||(origin&&origin!==`http://${req.headers.host}`))return send(req,res,403,{error:'Download request denied'});

@@ -8,7 +8,7 @@ function walk(dir) {
     return item.isDirectory() ? walk(file) : /\.c?js$/.test(file) ? [file] : [];
   });
 }
-const files = ['src', 'bin', 'scripts', 'examples', 'test'].flatMap(dir => walk(path.join(root, dir)));
+const files = ['src', 'bin', 'scripts', 'examples', 'test', 'viewer'].flatMap(dir => walk(path.join(root, dir)));
 for (const file of files) {
   const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(result.stderr);

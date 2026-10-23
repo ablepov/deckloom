@@ -565,6 +565,7 @@
       const downloadState = { busy:false, capabilities:[], failed:null };
 
       const config = window.deckloomConfig || {};
+      const apiUrl = suffix => `${config.apiBase || '/api'}${suffix}`;
       const storagePrefix = config.storagePrefix || "deckloom";
       const state = {
         decks: [],
@@ -701,7 +702,7 @@
       }
       function syncDownloads() {
         const capability=downloadState.capabilities.find(c=>c.deckId===state.deckId);
-        downloadButton.disabled=downloadState.busy||!capability?.pdf||!state.slides.length;
+        downloadButton.disabled=downloadState.busy||!(capability?.pdf||capability?.pptx||capability?.fonts)||!state.slides.length;
         downloadButton.setAttribute('aria-busy',String(downloadState.busy));
         downloadButton.querySelector('.download-label').textContent=downloadState.busy?'Готовим…':'Скачать';
         const downloadLabel=downloadState.busy?'Готовим файл выбранной колоды':'Скачать выбранную колоду';
@@ -725,16 +726,26 @@
         if(downloadState.busy)return;
         const deck=state.decks.find(d=>d.id===deckId);if(!deck)return;
         const kind=format==='pdf'?'PDF':format==='pptx'?'PPTX':'ZIP со шрифтами';
+        const capability=downloadState.capabilities.find(c=>c.deckId===deckId);
+        if(capability?.mode==='ready'){
+          const link=capability.links?.[format];
+          if(!link||typeof link.url!=='string')return;
+          const target=new URL(link.url,location.href);
+          if(target.protocol!=='https:'&&!(target.protocol==='http:'&&target.origin===location.origin))return;
+          closeDownloadMenu(true);
+          const a=document.createElement('a');a.href=target.href;a.download=link.filename||'';a.rel='noopener';document.body.append(a);a.click();a.remove();
+          showDownloadNotice(`Скачивание ${kind} · ${deck.label}`,{url:target.href,filename:link.filename});return;
+        }
         closeDownloadMenu(true);downloadState.busy=true;syncDownloads();
         showDownloadNotice(`Готовим ${kind} · ${deck.label}…`);
         try{
-          const response=await fetch('/api/downloads',{method:'POST',signal:AbortSignal.timeout(30000),headers:{'Content-Type':'application/json','X-Deckloom-Token':config.downloadToken},body:JSON.stringify({deckId,format})});
+          const response=await fetch(apiUrl('/downloads'),{method:'POST',signal:AbortSignal.timeout(30000),headers:{'Content-Type':'application/json','X-Deckloom-Token':config.downloadToken},body:JSON.stringify({deckId,format})});
           let job=await response.json();if(!response.ok)throw Object.assign(new Error('Export failed'),{code:job.code});
           const deadline=Date.now()+15*60*1000;
           while(!['complete','failed'].includes(job.state)){
             if(Date.now()>deadline)throw new Error('Export timed out');
             await new Promise(resolve=>setTimeout(resolve,700));
-            const poll=await fetch(`/api/downloads/${job.id}`,{cache:'no-store',signal:AbortSignal.timeout(30000)});if(!poll.ok)throw new Error('Export status unavailable');job=await poll.json();
+            const poll=await fetch(apiUrl(`/downloads/${job.id}`),{cache:'no-store',signal:AbortSignal.timeout(30000)});if(!poll.ok)throw new Error('Export status unavailable');job=await poll.json();
             if(job.progress?.stage==='render')showDownloadNotice(`Готовим ${kind} · ${deck.label}: ${job.progress.completed} из ${job.progress.total} слайдов`,{progress:true});
             else if(job.progress?.stage==='pptx')showDownloadNotice(`Собираем ${kind} · ${deck.label}…`,{progress:true});
           }
@@ -762,7 +773,7 @@
       });
       document.addEventListener('pointerdown',event=>{if(!downloadControl.contains(event.target))closeDownloadMenu();});
       window.addEventListener('blur',()=>closeDownloadMenu());
-      fetch('/api/downloads',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{downloadState.capabilities=data.decks||[];syncDownloads();}).catch(()=>{});
+      fetch(apiUrl('/downloads'),{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{downloadState.capabilities=data.decks||[];syncDownloads();}).catch(()=>{});
 
       function fileLabel(file) {
         return file.replace(/\.(png|jpe?g|webp|html)$/i, "");
@@ -1190,6 +1201,7 @@
           history.replaceState(null, "", location.pathname + location.search + hash);
         }
         scheduleHtmlFrameScale();
+        window.dispatchEvent(new Event('deckloom:change'));
       }
 
       function renderSlides() {
@@ -1349,7 +1361,7 @@
         state.requestInFlight = true;
 
         try {
-          const response = await fetch(`/api/decks?ts=${Date.now()}`, {
+          const response = await fetch(apiUrl(`/decks?ts=${Date.now()}`), {
             cache: "no-store",
           });
 
@@ -1452,9 +1464,11 @@
         if (index >= 0) setIndex(index);
       });
 
+      window.deckloomViewer = { state, openSlide, setMode, setIndex };
       setMode(state.mode === "deck" ? "deck" : "focus");
       loadSlides();
-      setInterval(loadSlides, 1000);
+      if(!config.published)setInterval(loadSlides, 1000);
     </script>
+    __DECKLOOM_COMMENTS__
   </body>
 </html>

@@ -6,7 +6,7 @@ const ID = /^[A-Za-z0-9_-]+$/;
 const DIGITS = /^[0-9]+$/;
 const owns = (object, key) => Object.hasOwn(object, key) && object[key] !== undefined;
 const hooks = ['renderDocument', 'validateDocument', 'renderSpec', 'renderQa', 'reportName', 'measureLayout', 'issueCount'];
-const projectKeys = ['contractVersion', 'id', 'mode', 'root', 'decks', 'artifacts', 'viewer', 'staticMounts', 'data', 'downloads', 'layoutOptions', ...hooks];
+const projectKeys = ['contractVersion', 'id', 'mode', 'root', 'decks', 'artifacts', 'viewer', 'staticMounts', 'data', 'downloads', 'comments', 'layoutOptions', ...hooks];
 const deckKeys = ['id', 'label', 'width', 'height', 'slides', 'artifactPrefix', 'expectedSlides', 'data'];
 const slideKeys = ['id', 'name', 'width', 'height', 'artifactNo', 'data'];
 const models = new WeakSet();
@@ -184,6 +184,7 @@ function normalizeProject(input, { cwd = process.cwd() } = {}) {
     layoutOptions: input.layoutOptions, diagnostics: Object.freeze(diagnostics),
   };
   if(owns(input,'downloads')){record(input.downloads,'project.downloads');normalized.downloads=Object.freeze({...input.downloads});}
+  if(owns(input,'comments')){record(input.comments,'project.comments');normalized.comments=Object.freeze({...input.comments});}
   for (const hook of hooks) if (owns(input, hook)) normalized[hook] = input[hook];
   if (legacy) {
     for (const hook of ['renderDocument', 'renderSpec', 'reportName']) if (normalized[hook]) {

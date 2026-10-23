@@ -83,15 +83,9 @@ function createDownloadService(input) {
         bytes=await fs.readFile(output.file);
       }else{
         job.progress={stage:'pptx',completed:job.total,total:job.total};
-        const fonts=await sourceFonts(cfg.pptx.fonts),profile=JSON.parse((await pinned(cfg.pptx.metrics.file,cfg.pptx.metrics.sha256)).toString('utf8'));
-        const report=result.reports[job.deckId];
-        const sources=report.map(r=>({id:r.slideId||r.slide||r.id,html:r.artifacts.html}));
         const deck=model.decks.find(d=>d.id===job.deckId);
-        if(deck.slides.some(s=>s.width!==deck.width||s.height!==deck.height))throw fail('PPTX_UNSUPPORTED_CANVAS','Semantic PPTX requires a uniform slide canvas');
         const directory=path.join(job.directory,'semantic');
-        const scenes=await require('./pptx-semantic.cjs').capture(sources,directory,cfg.pptx.roles,{width:deck.width,height:deck.height},{signal:job.controller.signal,onProgress:event=>{job.progress={stage:'pptx',completed:event.completed,total:job.total}}});
-        if(job.controller.signal.aborted)throw fail('CANCELLED','Download cancelled');
-        const output=await require('./pptx-measured.cjs').render(scenes,{directory,fonts,profile});bytes=output.bytes;
+        const {output,fonts}=await semanticExport(result,deck,cfg,directory,{signal:job.controller.signal,onProgress:event=>{job.progress={stage:'pptx',completed:event.completed,total:job.total}}});bytes=output.bytes;
         await fs.writeFile(path.join(job.directory,'conversion.json'),JSON.stringify(output.conversion,null,2));
         if(job.format==='pptx-fonts')bytes=await fontArchive(bytes,job.label,fonts,cfg.pptx.fonts,new Set(output.conversion.fonts.map(f=>f.sha256)));
       }
@@ -131,4 +125,12 @@ function createDownloadService(input) {
     async close(){closed=true;clearInterval(timer);active?.controller.abort();await active?.promise;for(const job of [...jobs.values()])await remove(job);if(base&&path.dirname(base)===os.tmpdir()&&path.basename(base).startsWith('deckloom-downloads-'))await fs.rm(base,{recursive:true,force:true,maxRetries:3});}
   };
 }
-module.exports={createDownloadService,fontArchive};
+async function semanticExport(result,deck,cfg,directory,options={}) {
+  const fonts=await sourceFonts(cfg.pptx.fonts),profile=JSON.parse((await pinned(cfg.pptx.metrics.file,cfg.pptx.metrics.sha256)).toString('utf8'));
+  const sources=result.reports[deck.id].map(r=>({id:r.slideId||r.slide||r.id,html:r.artifacts.html}));
+  if(deck.slides.some(s=>s.width!==deck.width||s.height!==deck.height))throw fail('PPTX_UNSUPPORTED_CANVAS','Semantic PPTX requires a uniform slide canvas');
+  const scenes=await require('./pptx-semantic.cjs').capture(sources,directory,cfg.pptx.roles,{width:deck.width,height:deck.height},options);
+  if(options.signal?.aborted)throw fail('CANCELLED','Download cancelled');
+  return {fonts,output:await require('./pptx-measured.cjs').render(scenes,{directory,fonts,profile})};
+}
+module.exports={createDownloadService,fontArchive,semanticExport};

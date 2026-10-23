@@ -48,7 +48,7 @@ async function main() {
     await page.locator('#deckMode').click(); await page.setViewportSize({ width: 400, height: 800 });
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     assert.deepEqual(errors, []);
-    let v1Read = false, discovery = false, v1Render = false, v1Export = false, f1Document = false, f2g1Engine = false;
+    let v1Read = false, discovery = false, v1Render = false, v1Export = false, f1Document = false, f2g1Engine = false, pointComments = false;
     if (process.argv.includes('--expect-read-v1')) {
       assert.strictEqual(engine.presentation, node.presentation);
       const document = {
@@ -76,6 +76,19 @@ async function main() {
       const store = engine.storage.createStore({ root: path.join(__dirname, 'engine-store'), catalog }), saved = await store.save(editable, { expectedToken: null });
       assert.deepEqual(await store.load('installed-engine', 'main'), saved);
       assert.equal(engine.compositions.validateDocument(saved.document, catalog).slides.length, 2); f2g1Engine = true;
+      const discussions = engine.comments.empty({ sourceId: 'installed', projectId: 'installed-comments', deckId: 'main' });
+      assert.deepEqual(engine.comments.parse(engine.comments.serialize(discussions)), discussions);
+      const commentArchive = await engine.comments.exportBundle(discussions, () => { throw new Error('No image expected'); });
+      assert.deepEqual(engine.comments.importBundle(commentArchive).document, discussions);
+      const commentStore = engine.comments.createStore({ root: path.join(__dirname, 'comment-store') });
+      const commentScope = { projectId: 'installed-comments', deckId: 'main' };
+      const commentSaved = await commentStore.compareAndSwap(commentScope, discussions, null);
+      assert.deepEqual(await commentStore.load(commentScope), { document: discussions, token: commentSaved.token });
+      const viewerPage = engine.viewer.renderPage({ title: 'Комментарии — «пример»', config: { apiBase: '/api/host-viewer', comments: true, commentsBase: '/api/host-comments' } });
+      assert(viewerPage.includes('/api/host-comments/ui.js')); assert(!viewerPage.includes('__DECKLOOM_'));
+      assert(engine.viewer.asset('comments.js').includes('deckloomViewer'));
+      assert.throws(() => engine.viewer.asset('../package.json'));
+      pointComments = true;
       const readProject = {
         contractVersion: 1, id: 'installed-read', mode: 'registered', root: project.root,
         artifacts: { layout: 'legacy' }, staticMounts: project.staticMounts,
@@ -157,7 +170,7 @@ async function main() {
       assert.deepEqual(errors, []); v1Export = true;
     }
     await page.close();
-    console.log(JSON.stringify({ status: 'passed', imports: 3, decks: 2, slides: 3, apiRenderSlides: reports.length, viewer: true, localSvg: true, cyrillic: true, spec: true, qa: true, ...(v1Read ? { v1Read, discovery, v1Render, v1Export, f1Document, f2g1Engine } : {}) }));
+    console.log(JSON.stringify({ status: 'passed', imports: 3, decks: 2, slides: 3, apiRenderSlides: reports.length, viewer: true, localSvg: true, cyrillic: true, spec: true, qa: true, ...(v1Read ? { v1Read, discovery, v1Render, v1Export, f1Document, f2g1Engine, pointComments } : {}) }));
   } finally {
     if (browser) await browser.close();
     if (server) await new Promise(resolve => server.close(resolve));

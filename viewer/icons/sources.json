@@ -4,6 +4,12 @@
   "storage": "SVG markup inlined in viewer/index.html; no runtime library dependency",
   "icons": [
     {
+      "name": "message-square",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/20aef31db93fe4d9f398dbb15b120d99c48eef95/icons/message-square.svg",
+      "sha256": "5812a3be783fdcd73efd2b6026e03131e4b8c6649e7d52aa2dc7bf2e2023a59d",
+      "storage": "SVG markup inlined in viewer/comments.js"
+    },
+    {
       "name": "layers",
       "url": "https://raw.githubusercontent.com/lucide-icons/lucide/20aef31db93fe4d9f398dbb15b120d99c48eef95/icons/layers.svg",
       "sha256": "ce16d0a955e3581cda17f6b2fd5c5bc2034b405f9cecc31c8ebb8495b4afc1bb"

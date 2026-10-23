@@ -78,11 +78,21 @@ async function main() {
     await assert.rejects(npm(['exec', '--offline', '--', 'deckloom', 'render', '--config=deckloom.config.cjs', '--deck=missing'], consumer), error => error.code === 1 && error.stderr.includes('Unknown deck'));
     const checked = await run([path.join(consumer, 'check-consumer.cjs'), ...(published ? [] : ['--expect-read-v1'])], consumer);
     report.consumer = JSON.parse(checked.stdout.trim().split(/\r?\n/).at(-1));
+    const hostConfig = process.argv.find(arg => arg.startsWith('--consumer-config='))?.slice('--consumer-config='.length);
+    if (!published && hostConfig) {
+      const hostDeck = process.argv.find(arg => arg.startsWith('--consumer-deck='))?.slice('--consumer-deck='.length);
+      assert(path.isAbsolute(hostConfig) && hostDeck, 'Host check requires absolute --consumer-config and --consumer-deck');
+      await fs.copyFile(path.join(root, 'test/fixtures/comment-host-consumer.cjs'), path.join(consumer, 'check-comment-host.cjs'));
+      const result = await run([path.join(consumer, 'check-comment-host.cjs'), hostConfig, hostDeck], consumer);
+      report.commentHost = JSON.parse(result.stdout.trim().split(/\r?\n/).at(-1));
+      assert.equal(report.commentHost.passed, true);
+    }
     if (!published) {
       assert.equal(report.consumer.v1Read, true); assert.equal(report.consumer.discovery, true); assert.equal(report.consumer.v1Render, true);
       assert.equal(report.consumer.v1Export, true);
       assert.equal(report.consumer.f1Document, true);
       assert.equal(report.consumer.f2g1Engine, true);
+      assert.equal(report.consumer.pointComments, true);
       const v1Cli = await npm(['exec', '--offline', '--', 'deckloom', 'render', '--config=runtime.config.cjs', '--deck=all'], consumer);
       report.v1Cli = JSON.parse(v1Cli.stdout);
       assert.equal(report.v1Cli.slides, 5); assert.deepEqual(report.v1Cli.failed, []);
